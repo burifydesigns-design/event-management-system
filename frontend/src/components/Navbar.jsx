@@ -13,15 +13,13 @@ export default function Navbar() {
   }
 
   const navLinks = [
+    { to: '/', label: 'Home' },
     { to: '/events', label: 'Events' },
   ]
 
-  if (user?.role === 'organizer' || user?.role === 'admin') {
-    navLinks.push({ to: '/create-event', label: 'Create Event' })
-  }
-
-  if (user?.role === 'admin') {
-    navLinks.push({ to: '/dashboard', label: 'Dashboard' })
+  if (user) {
+    navLinks.push({ to: '/my-events', label: 'My Events' })
+    navLinks.push({ to: '/profile', label: 'Profile' })
   }
 
   return (
