@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 
 export default function EventCard({ event }) {
-  const eventId = event.id || event._id
+  const eventId = event._id
   const imageUrl = event.image || 'https://via.placeholder.com/400x250?text=No+Image'
   const eventDate = new Date(event.date).toLocaleDateString('en-US', {
     month: 'short',
@@ -9,16 +9,11 @@ export default function EventCard({ event }) {
     year: 'numeric',
   })
 
-  const registered = event.registered ?? event.registeredCount ?? 0
-  const seatsRemaining = event.capacity - registered
-  const isFull = seatsRemaining <= 0
-
   return (
     <div className="event-card">
       <div className="event-card-image">
         <img src={imageUrl} alt={event.title} loading="lazy" />
         <span className="event-card-badge">{event.category}</span>
-        {isFull && <span className="event-card-full">Sold Out</span>}
       </div>
       <div className="event-card-content">
         <h3 className="event-card-title">{event.title}</h3>
@@ -37,13 +32,9 @@ export default function EventCard({ event }) {
             {event.price ? `$${event.price}` : 'Free'}
           </div>
           <div className="event-card-seats">
-            {isFull ? (
-              <span className="seats-full">Sold Out</span>
-            ) : (
-              <span className={seatsRemaining <= 10 ? 'seats-low' : 'seats-available'}>
-                {seatsRemaining} seats left
-              </span>
-            )}
+            <span className="seats-available">
+              {event.capacity} capacity
+            </span>
           </div>
         </div>
         <Link to={`/events/${eventId}`} className="btn btn-primary btn-block">

@@ -1,12 +1,47 @@
+import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import eventsData from '../data/events'
+import { getEvent } from '../services/eventService'
+import Loading from '../components/Loading'
+import ErrorMessage from '../components/ErrorMessage'
 import '../styles/event-details.css'
 
 export default function EventDetails() {
   const { id } = useParams()
-  const event = eventsData.find((e) => String(e.id) === String(id))
+  const [event, setEvent] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  if (!event) {
+  useEffect(() => {
+    const fetchEvent = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const data = await getEvent(id)
+        setEvent(data)
+      } catch (err) {
+        if (err.response?.status === 404) {
+          setError('not_found')
+        } else {
+          setError('Failed to load event. Please try again.')
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchEvent()
+  }, [id])
+
+  if (loading) {
+    return (
+      <div className="page-event-details">
+        <div className="container">
+          <Loading text="Loading event..." />
+        </div>
+      </div>
+    )
+  }
+
+  if (error === 'not_found' || !event) {
     return (
       <div className="page-event-details">
         <div className="container">
@@ -25,16 +60,22 @@ export default function EventDetails() {
     )
   }
 
+  if (error) {
+    return (
+      <div className="page-event-details">
+        <div className="container">
+          <ErrorMessage message={error} />
+        </div>
+      </div>
+    )
+  }
+
   const eventDate = new Date(event.date).toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   })
-
-  const registered = event.registered ?? 0
-  const seatsLeft = event.capacity - registered
-  const isFull = seatsLeft <= 0
 
   return (
     <div className="page-event-details">
@@ -108,24 +149,13 @@ export default function EventDetails() {
                       <span className="event-detail-stat-label">Capacity</span>
                       <span className="event-detail-stat-value">{event.capacity}</span>
                     </div>
-                    <div className="event-detail-stat">
-                      <span className="event-detail-stat-label">Registered</span>
-                      <span className="event-detail-stat-value">{registered}</span>
-                    </div>
-                    <div className="event-detail-stat">
-                      <span className="event-detail-stat-label">Seats Left</span>
-                      <span className={`event-detail-stat-value ${isFull ? 'text-danger' : ''}`}>
-                        {seatsLeft}
-                      </span>
-                    </div>
                   </div>
 
                   <button
                     type="button"
                     className="btn btn-primary btn-block btn-lg"
-                    disabled={isFull}
                   >
-                    {isFull ? 'Event Full' : 'Register for Event'}
+                    Register for Event
                   </button>
                 </div>
               </div>

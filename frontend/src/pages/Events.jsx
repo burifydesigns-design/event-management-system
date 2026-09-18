@@ -1,38 +1,59 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import EventCard from '../components/EventCard'
-import eventsData from '../data/events'
+import { getEvents } from '../services/eventService'
+import Loading from '../components/Loading'
+import ErrorMessage from '../components/ErrorMessage'
 import '../styles/events.css'
 
 export default function Events() {
+  const [events, setEvents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
   const [dateFilter, setDateFilter] = useState('')
 
-  const categories = useMemo(() => {
-    return [...new Set(eventsData.map((event) => event.category))].sort()
-  }, [])
+  const categories = [...new Set(events.map((event) => event.category))].sort()
 
-  const filteredEvents = useMemo(() => {
-    return eventsData.filter((event) => {
-      const term = search.toLowerCase().trim()
-      const matchesSearch =
-        !term ||
-        event.title.toLowerCase().includes(term) ||
-        event.description.toLowerCase().includes(term) ||
-        event.city.toLowerCase().includes(term)
-
-      const matchesCategory = !category || event.category === category
-
-      let matchesDate = true
-      if (dateFilter === 'upcoming') {
-        matchesDate = new Date(event.date) >= new Date(new Date().toDateString())
-      } else if (dateFilter === 'past') {
-        matchesDate = new Date(event.date) < new Date(new Date().toDateString())
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const params = {}
+        if (search) params.search = search
+        if (category) params.category = category
+        if (dateFilter) params.date = dateFilter
+        const data = await getEvents(params)
+        setEvents(data.events || [])
+      } catch (err) {
+        setError('Failed to load events. Please try again.')
+      } finally {
+        setLoading(false)
       }
-
-      return matchesSearch && matchesCategory && matchesDate
-    })
+    }
+    fetchEvents()
   }, [search, category, dateFilter])
+
+  if (loading) {
+    return (
+      <div className="page-events">
+        <div className="container">
+          <Loading text="Loading events..." />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="page-events">
+        <div className="container">
+          <ErrorMessage message={error} />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="page-events">
@@ -81,7 +102,7 @@ export default function Events() {
           </div>
         </div>
 
-        {filteredEvents.length === 0 ? (
+        {events.length === 0 ? (
           <div className="empty-state">
             <p className="empty-state-icon">📭</p>
             <p className="empty-state-title">No events found</p>
@@ -91,8 +112,8 @@ export default function Events() {
           </div>
         ) : (
           <div className="events-grid">
-            {filteredEvents.map((event) => (
-              <EventCard key={event.id} event={event} />
+            {events.map((event) => (
+              <EventCard key={event._id} event={event} />
             ))}
           </div>
         )}

@@ -1,5 +1,5 @@
 const Event = require('../models/Event');
-const Registration = require('../models/Registration');
+const mongoose = require('mongoose');
 
 const today = () => {
   const d = new Date();
@@ -16,10 +16,11 @@ exports.listEvents = async (req, res, next) => {
       query.$or = [
         { title: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } },
+        { city: { $regex: search, $options: 'i' } }
       ];
     }
     if (category) query.category = category;
-    if (city) query.city = city;
+    if (city) query.city = { $regex: city, $options: 'i' };
     if (date === 'upcoming') query.date = { $gte: today() };
     if (date === 'past') query.date = { $lt: today() };
     if (price === 'free') query.price = 0;
@@ -40,6 +41,9 @@ exports.listEvents = async (req, res, next) => {
 
 exports.getEvent = async (req, res, next) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid event ID' });
+    }
     const event = await Event.findById(req.params.id).populate('organizer', 'name email');
     if (!event) return res.status(404).json({ message: 'Event not found' });
     res.json(event);
@@ -50,7 +54,7 @@ exports.getEvent = async (req, res, next) => {
 
 exports.createEvent = async (req, res, next) => {
   try {
-    const event = await Event.create({ ...req.body, organizer: req.user._id });
+    const event = await Event.create({ ...req.body, organizer: req.user.userId });
     res.status(201).json(event);
   } catch (err) {
     next(err);
@@ -61,7 +65,7 @@ exports.updateEvent = async (req, res, next) => {
   try {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ message: 'Event not found' });
-    if (String(event.organizer) !== String(req.user._id) && req.user.role !== 'admin') {
+    if (String(event.organizer) !== String(req.user.userId) && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not your event' });
     }
     const updated = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -75,7 +79,7 @@ exports.deleteEvent = async (req, res, next) => {
   try {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ message: 'Event not found' });
-    if (String(event.organizer) !== String(req.user._id) && req.user.role !== 'admin') {
+    if (String(event.organizer) !== String(req.user.userId) && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not your event' });
     }
     await event.deleteOne();
@@ -89,7 +93,7 @@ exports.publishEvent = async (req, res, next) => {
   try {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ message: 'Event not found' });
-    if (String(event.organizer) !== String(req.user._id) && req.user.role !== 'admin') {
+    if (String(event.organizer) !== String(req.user.userId) && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not your event' });
     }
     event.status = event.status === 'published' ? 'draft' : 'published';
