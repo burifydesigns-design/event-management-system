@@ -1,6 +1,9 @@
 import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 export default function Footer() {
+  const { user } = useAuth()
+
   return (
     <footer className="footer">
       <div className="container">
@@ -11,22 +14,26 @@ export default function Footer() {
               <span className="brand-text">EventEase</span>
             </Link>
             <p className="footer-description">
-              Discover and manage amazing events. Connect with organizers and attendees worldwide.
+              Discover, create, and experience amazing events.
             </p>
           </div>
 
           <div className="footer-links">
-            <h4>Platform</h4>
-            <Link to="/events">Browse Events</Link>
-            <Link to="/events">Upcoming Events</Link>
-            <Link to="/events">Past Events</Link>
+            <h4>Navigate</h4>
+            <Link to="/">Home</Link>
+            <Link to="/events">Events</Link>
           </div>
 
           <div className="footer-links">
             <h4>Account</h4>
             <Link to="/login">Login</Link>
             <Link to="/register">Register</Link>
-            <Link to="/profile">My Profile</Link>
+            {user && (
+              <>
+                <Link to="/my-events">My Events</Link>
+                <Link to="/profile">Profile</Link>
+              </>
+            )}
           </div>
 
           <div className="footer-links">
@@ -38,7 +45,7 @@ export default function Footer() {
         </div>
 
         <div className="footer-bottom">
-          <p>&copy; {new Date().getFullYear()} EventEase. All rights reserved.</p>
+          <p>&copy; 2026 EventEase. All rights reserved.</p>
         </div>
       </div>
     </footer>
