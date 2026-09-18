@@ -4,30 +4,22 @@ import { useAuth } from '../context/AuthContext'
 import Loading from '../components/Loading'
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
-import { getProfile, updateProfile } from '../services/authService'
 
 export default function Profile() {
   const navigate = useNavigate()
-  const { user, setUser } = useAuth()
-  const [formData, setFormData] = useState({ name: '', email: '' })
+  const { user, updateProfile } = useAuth()
+  const [name, setName] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const data = await getProfile()
-        setFormData({ name: data.name || '', email: data.email || '' })
-      } catch (err) {
-        setError('Unable to load profile. Please try again.')
-      } finally {
-        setLoading(false)
-      }
+    if (user) {
+      setName(user.name || '')
     }
-    fetchProfile()
-  }, [])
+    setLoading(false)
+  }, [user])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -36,18 +28,13 @@ export default function Profile() {
     setSuccess(null)
 
     try {
-      const updated = await updateProfile(formData)
-      setUser(updated)
+      await updateProfile({ name })
       setSuccess('Profile updated successfully!')
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update profile.')
     } finally {
       setSaving(false)
     }
-  }
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
   if (loading) return <Loading text="Loading profile..." />
@@ -66,14 +53,12 @@ export default function Profile() {
 
           <div className="profile-info">
             <div className="profile-field">
-              <span className="profile-label">Role</span>
-              <span className="profile-value profile-role">{user?.role}</span>
+              <span className="profile-label">Email</span>
+              <span className="profile-value">{user?.email}</span>
             </div>
             <div className="profile-field">
-              <span className="profile-label">Member Since</span>
-              <span className="profile-value">
-                {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
-              </span>
+              <span className="profile-label">Role</span>
+              <span className="profile-value profile-role">{user?.role}</span>
             </div>
           </div>
 
@@ -83,22 +68,8 @@ export default function Profile() {
               <input
                 id="name"
                 type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                className="form-input"
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="email" className="form-label">Email</label>
-              <input
-                id="email"
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className="form-input"
                 required
               />

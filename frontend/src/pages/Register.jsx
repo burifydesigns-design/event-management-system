@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { register } from '../services/authService'
 import Loading from '../components/Loading'
 import ErrorMessage from '../components/ErrorMessage'
 
 export default function Register() {
   const navigate = useNavigate()
-  const { setUser } = useAuth()
+  const { register } = useAuth()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -36,9 +35,8 @@ export default function Register() {
     setLoading(true)
 
     try {
-      const data = await register(formData.name, formData.email, formData.password)
-      setUser(data.user)
-      navigate('/events')
+      await register(formData.name, formData.email, formData.password)
+      navigate('/')
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.')
     } finally {
