@@ -23,7 +23,7 @@ export default function MyEvents() {
       try {
         setLoading(true)
         const data = await getMyEvents()
-        setRegistrations(data.data || data || [])
+        setRegistrations(data.registrations || data.data?.registrations || data.data || data || [])
       } catch (err) {
         setError('Unable to load your events. Please try again.')
       } finally {

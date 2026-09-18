@@ -29,8 +29,3 @@ export const publishEvent = async (id) => {
   const { data } = await api.put(`/events/${id}/publish`)
   return data
 }
-
-export const getMyEvents = async () => {
-  const { data } = await api.get('/events/my')
-  return data
-}

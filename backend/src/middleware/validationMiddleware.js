@@ -29,7 +29,7 @@ function validateLogin(req, res, next) {
 }
 
 function validateEvent(req, res, next) {
-  const fields = ['title', 'description', 'category', 'date', 'time', 'location', 'city', 'capacity', 'price'];
+  const fields = ['title', 'description', 'category', 'date', 'time', 'location', 'city', 'capacity'];
   for (const field of fields) {
     if (req.body[field] === undefined || req.body[field] === null || req.body[field] === '') {
       return res.status(400).json({ message: `${field} is required` });
@@ -38,7 +38,7 @@ function validateEvent(req, res, next) {
   if (req.body.capacity < 1) {
     return res.status(400).json({ message: 'Capacity must be at least 1' });
   }
-  if (req.body.price < 0) {
+  if (req.body.price !== undefined && req.body.price !== null && req.body.price !== '' && Number(req.body.price) < 0) {
     return res.status(400).json({ message: 'Price cannot be negative' });
   }
   next();

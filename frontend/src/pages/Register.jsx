@@ -8,7 +8,7 @@ import '../styles/auth.css'
 
 export default function Register() {
   const navigate = useNavigate()
-  const { setUser } = useAuth()
+  const { register } = useAuth()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -37,8 +37,7 @@ export default function Register() {
     setLoading(true)
 
     try {
-      const data = await register(formData.name, formData.email, formData.password)
-      setUser(data.user)
+      await register(formData.name, formData.email, formData.password)
       navigate('/events')
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.')

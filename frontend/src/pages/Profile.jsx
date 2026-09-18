@@ -4,11 +4,10 @@ import { useAuth } from '../context/AuthContext'
 import Loading from '../components/Loading'
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
-import { getProfile, updateProfile } from '../services/authService'
 
 export default function Profile() {
   const navigate = useNavigate()
-  const { user, setUser } = useAuth()
+  const { user, updateProfile } = useAuth()
   const [formData, setFormData] = useState({ name: '', email: '' })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -18,7 +17,7 @@ export default function Profile() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const data = await getProfile()
+        const data = await updateProfile()
         setFormData({ name: data.name || '', email: data.email || '' })
       } catch (err) {
         setError('Unable to load profile. Please try again.')
@@ -36,8 +35,7 @@ export default function Profile() {
     setSuccess(null)
 
     try {
-      const updated = await updateProfile(formData)
-      setUser(updated)
+      await updateProfile(formData)
       setSuccess('Profile updated successfully!')
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update profile.')

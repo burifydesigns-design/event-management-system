@@ -1,21 +1,26 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { getEvent } from '../services/eventService'
+import { registerForEvent } from '../services/registrationService'
 import Loading from '../components/Loading'
 import ErrorMessage from '../components/ErrorMessage'
 import '../styles/event-details.css'
 
 export default function EventDetails() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const [event, setEvent] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [registering, setRegistering] = useState(false)
+  const [registrationMessage, setRegistrationMessage] = useState('')
 
   useEffect(() => {
     const fetchEvent = async () => {
       try {
         setLoading(true)
         setError(null)
+        setRegistrationMessage('')
         const data = await getEvent(id)
         setEvent(data)
       } catch (err) {
@@ -30,6 +35,24 @@ export default function EventDetails() {
     }
     fetchEvent()
   }, [id])
+
+  const handleRegister = async () => {
+    try {
+      setRegistering(true)
+      setRegistrationMessage('')
+      const response = await registerForEvent(event._id)
+      setRegistrationMessage(response.message || response.registration?.message || 'Successfully registered for the event.')
+    } catch (error) {
+      console.error(error)
+      if (error.response?.status === 401) {
+        navigate('/login')
+        return
+      }
+      setRegistrationMessage(error.response?.data?.message || 'Registration failed.')
+    } finally {
+      setRegistering(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -157,9 +180,17 @@ export default function EventDetails() {
                   <button
                     type="button"
                     className="btn btn-primary btn-block btn-lg"
+                    onClick={handleRegister}
+                    disabled={registering}
                   >
-                    Register for Event
+                    {registering ? 'Registering...' : 'Register for Event'}
                   </button>
+
+                  {registrationMessage && (
+                    <div className={`registration-message ${registrationMessage.toLowerCase().includes('successfully') || registrationMessage.toLowerCase().includes('success') ? 'registration-message--success' : 'registration-message--error'}`}>
+                      {registrationMessage}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

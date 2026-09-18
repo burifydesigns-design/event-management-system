@@ -21,6 +21,6 @@ export const cancelRegistration = async (id) => {
 }
 
 export const getMyEvents = async () => {
-  const { data } = await api.get('/registrations/my-events')
+  const { data } = await api.get('/registrations/my')
   return data
 }

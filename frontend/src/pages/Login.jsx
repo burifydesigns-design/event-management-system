@@ -8,7 +8,7 @@ import '../styles/auth.css'
 
 export default function Login() {
   const navigate = useNavigate()
-  const { setUser } = useAuth()
+  const { login } = useAuth()
   const [formData, setFormData] = useState({ email: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -19,8 +19,7 @@ export default function Login() {
     setError(null)
 
     try {
-      const data = await login(formData.email, formData.password)
-      setUser(data.user)
+      await login(formData.email, formData.password)
       navigate('/events')
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid email or password.')

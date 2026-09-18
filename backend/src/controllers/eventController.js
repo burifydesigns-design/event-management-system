@@ -54,7 +54,13 @@ exports.getEvent = async (req, res, next) => {
 
 exports.createEvent = async (req, res, next) => {
   try {
-    const event = await Event.create({ ...req.body, organizer: req.user.userId });
+    const eventData = { ...req.body, organizer: req.user.userId };
+    if (eventData.price === '' || eventData.price === undefined || eventData.price === null) {
+      eventData.price = 0;
+    } else {
+      eventData.price = Number(eventData.price);
+    }
+    const event = await Event.create(eventData);
     res.status(201).json(event);
   } catch (err) {
     next(err);

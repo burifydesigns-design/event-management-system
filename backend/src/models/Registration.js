@@ -7,7 +7,7 @@ const registrationSchema = new mongoose.Schema(
     ticketNumber: { type: String, required: true, unique: true, trim: true },
     status: {
       type: String,
-      enum: ['confirmed', 'cancelled'],
+      enum: ['confirmed', 'cancelled', 'checked-in'],
       default: 'confirmed',
     },
     checkedIn: { type: Boolean, default: false },
@@ -16,7 +16,5 @@ const registrationSchema = new mongoose.Schema(
   },
   { timestamps: true, autoIndex: true }
 );
-
-registrationSchema.index({ user: 1, event: 1 }, { unique: true });
 
 module.exports = mongoose.model('Registration', registrationSchema);

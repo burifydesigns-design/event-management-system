@@ -155,11 +155,10 @@ export default function CreateEvent() {
                   <option value="Technology">Technology</option>
                   <option value="Business">Business</option>
                   <option value="Music">Music</option>
+                  <option value="Education">Education</option>
                   <option value="Sports">Sports</option>
                   <option value="Arts">Arts</option>
-                  <option value="Education">Education</option>
-                  <option value="Health">Health</option>
-                  <option value="Food">Food</option>
+                  <option value="Other">Other</option>
                 </select>
                 {fieldErrors.category && <span className="field-error">{fieldErrors.category}</span>}
               </div>
