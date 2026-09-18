@@ -11,7 +11,8 @@ const events = [
     city: "Nairobi",
     capacity: 100,
     registered: 20,
-    price: 0
+    price: 0,
+    image: "https://picsum.photos/seed/react-workshop/800/400"
   },
   {
     id: "2",
@@ -25,7 +26,8 @@ const events = [
     city: "Nairobi",
     capacity: 150,
     registered: 70,
-    price: 25
+    price: 25,
+    image: "https://picsum.photos/seed/digital-marketing/800/400"
   },
   {
     id: "3",
@@ -39,7 +41,8 @@ const events = [
     city: "Nairobi",
     capacity: 500,
     registered: 350,
-    price: 15
+    price: 15,
+    image: "https://picsum.photos/seed/music-festival/800/400"
   },
   {
     id: "4",
@@ -53,7 +56,8 @@ const events = [
     city: "Nairobi",
     capacity: 80,
     registered: 45,
-    price: 10
+    price: 10,
+    image: "https://picsum.photos/seed/startup-network/800/400"
   },
   {
     id: "5",
@@ -67,7 +71,8 @@ const events = [
     city: "Mombasa",
     capacity: 300,
     registered: 120,
-    price: 50
+    price: 50,
+    image: "https://picsum.photos/seed/tech-conference/800/400"
   },
   {
     id: "6",
@@ -81,7 +86,8 @@ const events = [
     city: "Nairobi",
     capacity: 200,
     registered: 180,
-    price: 20
+    price: 20,
+    image: "https://picsum.photos/seed/jazz-night/800/400"
   }
 ];
 
