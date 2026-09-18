@@ -3,14 +3,19 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
     password: { type: String, required: true },
     role: {
       type: String,
-      enum: ['attendee', 'coordinator', 'organizer', 'admin'],
+      enum: ['attendee', 'organizer', 'admin'],
       default: 'attendee',
     },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // set for coordinator/organizer accounts made by admin
   },
   { timestamps: true }
 );
