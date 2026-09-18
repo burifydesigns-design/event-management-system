@@ -19,6 +19,7 @@ export default function Navbar() {
 
   if (user) {
     navLinks.push({ to: '/my-events', label: 'My Events' })
+    navLinks.push({ to: '/create-event', label: 'Create Event' })
     navLinks.push({ to: '/profile', label: 'Profile' })
   }
 

@@ -5,6 +5,7 @@ import { createEvent } from '../services/eventService'
 import Loading from '../components/Loading'
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
+import '../styles/forms.css'
 
 export default function CreateEvent() {
   const navigate = useNavigate()
@@ -24,18 +25,77 @@ export default function CreateEvent() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
+
+  const validateForm = () => {
+    const errors = {}
+    const trimmed = {}
+
+    const textFields = ['title', 'description', 'location', 'city']
+    for (const field of textFields) {
+      trimmed[field] = formData[field].trim()
+      if (!trimmed[field]) {
+        errors[field] = 'This field is required'
+      }
+    }
+
+    if (!formData.category) {
+      errors.category = 'Please select a category'
+    }
+
+    if (!formData.date) {
+      errors.date = 'Date is required'
+    }
+
+    if (!formData.time) {
+      errors.time = 'Time is required'
+    }
+
+    if (!formData.capacity && formData.capacity !== 0) {
+      errors.capacity = 'Capacity is required'
+    } else if (parseInt(formData.capacity, 10) < 1) {
+      errors.capacity = 'Capacity must be at least 1'
+    }
+
+    if (formData.price !== '' && (isNaN(parseFloat(formData.price)) || parseFloat(formData.price) < 0)) {
+      errors.price = 'Price cannot be negative'
+    }
+
+    if (formData.image && formData.image.trim()) {
+      try {
+        new URL(formData.image.trim())
+      } catch {
+        errors.image = 'Please enter a valid image URL'
+      }
+    }
+
+    setFieldErrors(errors)
+    return Object.keys(errors).length === 0
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
     setSuccess(null)
+    setFieldErrors({})
+
+    if (!validateForm()) {
+      setLoading(false)
+      return
+    }
 
     try {
       const eventData = {
         ...formData,
-        capacity: parseInt(formData.capacity),
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        category: formData.category,
+        location: formData.location.trim(),
+        city: formData.city.trim(),
+        capacity: parseInt(formData.capacity, 10),
         price: formData.price ? parseFloat(formData.price) : 0,
+        image: formData.image.trim(),
       }
       const data = await createEvent(eventData)
       setSuccess('Event created successfully!')
@@ -51,6 +111,7 @@ export default function CreateEvent() {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
+    setFieldErrors({ ...fieldErrors, [e.target.name]: '' })
   }
 
   return (
@@ -78,6 +139,7 @@ export default function CreateEvent() {
                   className="form-input"
                   required
                 />
+                {fieldErrors.title && <span className="field-error">{fieldErrors.title}</span>}
               </div>
               <div className="form-group">
                 <label htmlFor="category" className="form-label">Category *</label>
@@ -99,6 +161,7 @@ export default function CreateEvent() {
                   <option value="Health">Health</option>
                   <option value="Food">Food</option>
                 </select>
+                {fieldErrors.category && <span className="field-error">{fieldErrors.category}</span>}
               </div>
             </div>
 
@@ -113,6 +176,7 @@ export default function CreateEvent() {
                 rows={5}
                 required
               />
+              {fieldErrors.description && <span className="field-error">{fieldErrors.description}</span>}
             </div>
 
             <div className="form-row">
@@ -127,9 +191,10 @@ export default function CreateEvent() {
                   className="form-input"
                   required
                 />
+                {fieldErrors.date && <span className="field-error">{fieldErrors.date}</span>}
               </div>
               <div className="form-group">
-                <label htmlFor="time" className="form-label">Time</label>
+                <label htmlFor="time" className="form-label">Time *</label>
                 <input
                   id="time"
                   type="time"
@@ -137,7 +202,9 @@ export default function CreateEvent() {
                   value={formData.time}
                   onChange={handleChange}
                   className="form-input"
+                  required
                 />
+                {fieldErrors.time && <span className="field-error">{fieldErrors.time}</span>}
               </div>
             </div>
 
@@ -153,6 +220,7 @@ export default function CreateEvent() {
                   className="form-input"
                   required
                 />
+                {fieldErrors.location && <span className="field-error">{fieldErrors.location}</span>}
               </div>
               <div className="form-group">
                 <label htmlFor="city" className="form-label">City *</label>
@@ -165,6 +233,7 @@ export default function CreateEvent() {
                   className="form-input"
                   required
                 />
+                {fieldErrors.city && <span className="field-error">{fieldErrors.city}</span>}
               </div>
             </div>
 
@@ -181,6 +250,7 @@ export default function CreateEvent() {
                   min="1"
                   required
                 />
+                {fieldErrors.capacity && <span className="field-error">{fieldErrors.capacity}</span>}
               </div>
               <div className="form-group">
                 <label htmlFor="price" className="form-label">Price ($)</label>
@@ -194,6 +264,7 @@ export default function CreateEvent() {
                   min="0"
                   step="0.01"
                 />
+                {fieldErrors.price && <span className="field-error">{fieldErrors.price}</span>}
               </div>
             </div>
 
@@ -208,10 +279,11 @@ export default function CreateEvent() {
                 className="form-input"
                 placeholder="https://example.com/image.jpg"
               />
+              {fieldErrors.image && <span className="field-error">{fieldErrors.image}</span>}
             </div>
 
             <div className="form-actions">
-              <button type="button" onClick={() => navigate('/my-events')} className="btn btn-outline">
+              <button type="button" onClick={() => navigate('/events')} className="btn btn-outline">
                 Cancel
               </button>
               <button type="submit" disabled={loading} className="btn btn-primary">

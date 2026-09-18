@@ -29,7 +29,7 @@ function validateLogin(req, res, next) {
 }
 
 function validateEvent(req, res, next) {
-  const fields = ['title', 'category', 'date', 'time', 'location', 'city', 'capacity', 'price'];
+  const fields = ['title', 'description', 'category', 'date', 'time', 'location', 'city', 'capacity', 'price'];
   for (const field of fields) {
     if (req.body[field] === undefined || req.body[field] === null || req.body[field] === '') {
       return res.status(400).json({ message: `${field} is required` });

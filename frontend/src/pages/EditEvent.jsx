@@ -5,6 +5,7 @@ import { getEvent, updateEvent } from '../services/eventService'
 import Loading from '../components/Loading'
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
+import '../styles/forms.css'
 
 export default function EditEvent() {
   const { id } = useParams()

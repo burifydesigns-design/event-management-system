@@ -83,8 +83,11 @@ export default function EventDetails() {
         <div className="event-detail">
           <div className="event-detail-image">
             <img
-              src={event.image}
+              src={event.image || 'https://via.placeholder.com/800x400?text=No+Image'}
               alt={event.title}
+              onError={(e) => {
+                e.target.src = 'https://via.placeholder.com/800x400?text=No+Image'
+              }}
             />
             <span className="event-detail-badge">{event.category}</span>
           </div>

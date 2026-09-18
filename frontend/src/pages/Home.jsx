@@ -1,94 +1,10 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import EventCard from '../components/EventCard'
+import { getEvents } from '../services/eventService'
+import Loading from '../components/Loading'
 import '../styles/home.css'
-
-const MOCK_EVENTS = [
-  {
-    _id: '1',
-    title: 'React & JavaScript Workshop',
-    category: 'Technology',
-    date: '2026-07-15',
-    city: 'Nairobi',
-    location: 'Nairobi, Kenya',
-    time: '10:00 AM',
-    price: 25,
-    capacity: 100,
-    registeredCount: 72,
-    image: 'https://via.placeholder.com/400x250/4f46e5/ffffff?text=React+Workshop',
-    description: 'Hands-on workshop covering modern React patterns and JavaScript best practices.',
-  },
-  {
-    _id: '2',
-    title: 'Business Growth Summit',
-    category: 'Business',
-    date: '2026-07-22',
-    city: 'Nairobi',
-    location: 'Nairobi, Kenya',
-    time: '9:00 AM',
-    price: 50,
-    capacity: 200,
-    registeredCount: 134,
-    image: 'https://via.placeholder.com/400x250/0ea5e9/ffffff?text=Business+Summit',
-    description: 'Network with industry leaders and learn strategies to scale your business.',
-  },
-  {
-    _id: '3',
-    title: 'Live Music Festival',
-    category: 'Music',
-    date: '2026-08-02',
-    city: 'Nairobi',
-    location: 'Nairobi, Kenya',
-    time: '4:00 PM',
-    price: 35,
-    capacity: 500,
-    registeredCount: 320,
-    image: 'https://via.placeholder.com/400x250/f59e0b/ffffff?text=Music+Festival',
-    description: 'An unforgettable evening of live performances from top local and international artists.',
-  },
-  {
-    _id: '4',
-    title: 'Startup Pitch Night',
-    category: 'Business',
-    date: '2026-08-10',
-    city: 'Nairobi',
-    location: 'Nairobi, Kenya',
-    time: '6:00 PM',
-    price: 0,
-    capacity: 150,
-    registeredCount: 98,
-    image: 'https://via.placeholder.com/400x250/10b981/ffffff?text=Startup+Pitch',
-    description: 'Watch innovative startups pitch their ideas to a panel of investors.',
-  },
-  {
-    _id: '5',
-    title: 'Design Systems Conference',
-    category: 'Technology',
-    date: '2026-08-18',
-    city: 'Nairobi',
-    location: 'Nairobi, Kenya',
-    time: '9:00 AM',
-    price: 40,
-    capacity: 250,
-    registeredCount: 180,
-    image: 'https://via.placeholder.com/400x250/8b5cf6/ffffff?text=Design+Systems',
-    description: 'Deep dive into building scalable design systems for modern products.',
-  },
-  {
-    _id: '6',
-    title: 'Charity Run 5K',
-    category: 'Sports',
-    date: '2026-09-05',
-    city: 'Nairobi',
-    location: 'Nairobi, Kenya',
-    time: '7:00 AM',
-    price: 15,
-    capacity: 1000,
-    registeredCount: 650,
-    image: 'https://via.placeholder.com/400x250/ef4444/ffffff?text=Charity+Run',
-    description: 'Run for a cause. All proceeds go to local community development projects.',
-  },
-]
 
 const CATEGORIES = [
   'Technology',
@@ -119,6 +35,22 @@ const FEATURES = [
 
 export default function Home() {
   const { user } = useAuth()
+  const [events, setEvents] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const data = await getEvents({ limit: 6 })
+        setEvents(data.events || [])
+      } catch (err) {
+        setEvents([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchEvents()
+  }, [])
 
   return (
     <div className="home">
@@ -189,11 +121,23 @@ export default function Home() {
               View all →
             </Link>
           </div>
-          <div className="events-grid">
-            {MOCK_EVENTS.map((event) => (
-              <EventCard key={event._id} event={event} />
-            ))}
-          </div>
+          {loading ? (
+            <Loading text="Loading events..." />
+          ) : events.length === 0 ? (
+            <div className="empty-state">
+              <p className="empty-state-icon">📭</p>
+              <p className="empty-state-title">No events found</p>
+              <p className="empty-state-text">
+                Check back later for exciting events.
+              </p>
+            </div>
+          ) : (
+            <div className="events-grid">
+              {events.map((event) => (
+                <EventCard key={event._id} event={event} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

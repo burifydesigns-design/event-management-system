@@ -72,6 +72,12 @@
   min-height: 120px;
 }
 
+.field-error {
+  font-size: 0.875rem;
+  color: var(--danger);
+  margin-top: 0.25rem;
+}
+
 .form-actions {
   display: flex;
   gap: 1rem;

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { register } from '../services/authService'
 import Loading from '../components/Loading'
 import ErrorMessage from '../components/ErrorMessage'
+import '../styles/auth.css'
 
 export default function Register() {
   const navigate = useNavigate()
