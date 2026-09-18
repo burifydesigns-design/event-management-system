@@ -1,32 +1,29 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { useParams, Link } from 'react-router-dom'
+import { getEvent } from '../services/eventService'
 import Loading from '../components/Loading'
 import ErrorMessage from '../components/ErrorMessage'
-import SuccessMessage from '../components/SuccessMessage'
-import ConfirmDialog from '../components/ConfirmDialog'
-import { getEvent } from '../services/eventService'
-import { registerForEvent } from '../services/registrationService'
+import '../styles/event-details.css'
 
 export default function EventDetails() {
   const { id } = useParams()
-  const navigate = useNavigate()
-  const { user } = useAuth()
   const [event, setEvent] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [success, setSuccess] = useState(null)
-  const [registering, setRegistering] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
 
   useEffect(() => {
     const fetchEvent = async () => {
       try {
         setLoading(true)
+        setError(null)
         const data = await getEvent(id)
         setEvent(data)
       } catch (err) {
-        setError('Unable to load event details. Please try again.')
+        if (err.response?.status === 404) {
+          setError('not_found')
+        } else {
+          setError('Failed to load event. Please try again.')
+        }
       } finally {
         setLoading(false)
       }
@@ -34,36 +31,40 @@ export default function EventDetails() {
     fetchEvent()
   }, [id])
 
-  const handleRegister = async () => {
-    try {
-      setRegistering(true)
-      await registerForEvent(id)
-      setSuccess('Successfully registered for the event!')
-      setEvent((prev) => ({
-        ...prev,
-        registeredCount: (prev.registeredCount || 0) + 1,
-      }))
-    } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.')
-    } finally {
-      setRegistering(false)
-      setShowConfirm(false)
-    }
+  if (loading) {
+    return (
+      <div className="page-event-details">
+        <div className="container">
+          <Loading text="Loading event..." />
+        </div>
+      </div>
+    )
   }
 
-  if (loading) return <Loading text="Loading event details..." />
-  if (error && !event) return <ErrorMessage message={error} />
-
-  if (!event) {
+  if (error === 'not_found' || !event) {
     return (
-      <div className="container">
-        <div className="empty-state">
-          <p className="empty-state-icon">🔍</p>
-          <p className="empty-state-title">Event not found</p>
-          <p className="empty-state-text">The event you're looking for doesn't exist or has been removed.</p>
-          <button onClick={() => navigate('/events')} className="btn btn-primary">
-            Browse Events
-          </button>
+      <div className="page-event-details">
+        <div className="container">
+          <div className="event-not-found">
+            <p className="event-not-found-icon">🔍</p>
+            <h1 className="event-not-found-title">Event Not Found</h1>
+            <p className="event-not-found-text">
+              The event you're looking for does not exist.
+            </p>
+            <Link to="/events" className="btn btn-primary">
+              Back to Events
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="page-event-details">
+        <div className="container">
+          <ErrorMessage message={error} />
         </div>
       </div>
     )
@@ -76,141 +77,98 @@ export default function EventDetails() {
     day: 'numeric',
   })
 
-  const seatsRemaining = event.capacity - (event.registeredCount || 0)
-  const isFull = seatsRemaining <= 0
-  const isPast = new Date(event.date) < new Date()
-  const isOrganizer = user && event.organizer?._id === user._id
-  const isAdmin = user?.role === 'admin'
-
-  const registration = event.userRegistration
-
   return (
     <div className="page-event-details">
       <div className="container">
-        {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
-        {success && <SuccessMessage message={success} onClose={() => setSuccess(null)} />}
-
         <div className="event-detail">
           <div className="event-detail-image">
             <img
-              src={event.image || 'https://via.placeholder.com/800x400?text=Event+Image'}
+              src={event.image}
               alt={event.title}
             />
             <span className="event-detail-badge">{event.category}</span>
           </div>
 
           <div className="event-detail-content">
-            <div className="event-detail-header">
-              <div>
-                <h1 className="event-detail-title">{event.title}</h1>
-                <p className="event-detail-organizer">
-                  by {event.organizer?.name || 'Unknown Organizer'}
-                </p>
+            <div className="event-detail-layout">
+              <div className="event-detail-main">
+                <div className="event-detail-header">
+                  <div>
+                    <h1 className="event-detail-title">{event.title}</h1>
+                  </div>
+                </div>
+
+                <div className="event-detail-info">
+                  <div className="info-item">
+                    <span className="info-icon">📅</span>
+                    <div>
+                      <p className="info-label">Date</p>
+                      <p className="info-value">{eventDate}</p>
+                    </div>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-icon">🕐</span>
+                    <div>
+                      <p className="info-label">Time</p>
+                      <p className="info-value">{event.time || 'TBD'}</p>
+                    </div>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-icon">📍</span>
+                    <div>
+                      <p className="info-label">Location</p>
+                      <p className="info-value">{event.location}</p>
+                    </div>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-icon">🏙️</span>
+                    <div>
+                      <p className="info-label">City</p>
+                      <p className="info-value">{event.city}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="event-detail-description">
+                  <h3>About This Event</h3>
+                  <p>{event.description}</p>
+                </div>
               </div>
-              <div className="event-detail-price">
-                {event.price ? `$${event.price}` : 'Free'}
+
+              <div className="event-detail-sidebar">
+                <div className="event-detail-card">
+                  <div className="event-detail-card-header">
+                    <h3>Registration</h3>
+                    <div className="event-detail-price">
+                      {event.price === 0 ? 'Free' : `$${event.price}`}
+                    </div>
+                  </div>
+
+                  <div className="event-detail-stats">
+                    <div className="event-detail-stat">
+                      <span className="event-detail-stat-label">Capacity</span>
+                      <span className="event-detail-stat-value">{event.capacity}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-block btn-lg"
+                  >
+                    Register for Event
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className="event-detail-info">
-              <div className="info-item">
-                <span className="info-icon">📅</span>
-                <div>
-                  <p className="info-label">Date</p>
-                  <p className="info-value">{eventDate}</p>
-                </div>
-              </div>
-              <div className="info-item">
-                <span className="info-icon">🕐</span>
-                <div>
-                  <p className="info-label">Time</p>
-                  <p className="info-value">{event.time || 'TBD'}</p>
-                </div>
-              </div>
-              <div className="info-item">
-                <span className="info-icon">📍</span>
-                <div>
-                  <p className="info-label">Location</p>
-                  <p className="info-value">{event.location}</p>
-                </div>
-              </div>
-              <div className="info-item">
-                <span className="info-icon">🏙️</span>
-                <div>
-                  <p className="info-label">City</p>
-                  <p className="info-value">{event.city}</p>
-                </div>
-              </div>
-              <div className="info-item">
-                <span className="info-icon">👥</span>
-                <div>
-                  <p className="info-label">Capacity</p>
-                  <p className="info-value">
-                    {event.registeredCount || 0} / {event.capacity}
-                  </p>
-                </div>
-              </div>
-              <div className="info-item">
-                <span className="info-icon">💺</span>
-                <div>
-                  <p className="info-label">Seats Remaining</p>
-                  <p className={`info-value ${isFull ? 'text-danger' : ''}`}>
-                    {isFull ? 'Sold Out' : `${seatsRemaining} available`}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="event-detail-description">
-              <h3>About This Event</h3>
-              <p>{event.description}</p>
-            </div>
-
-            <div className="event-detail-actions">
-              {registration ? (
-                <Link to={`/my-ticket/${registration._id}`} className="btn btn-primary btn-lg">
-                  View Ticket
-                </Link>
-              ) : !user ? (
-                <Link to="/login" className="btn btn-primary btn-lg">
-                  Login to Register
-                </Link>
-              ) : isPast ? (
-                <button className="btn btn-secondary btn-lg" disabled>
-                  Event Ended
-                </button>
-              ) : isFull ? (
-                <button className="btn btn-secondary btn-lg" disabled>
-                  Event Full
-                </button>
-              ) : isOrganizer || isAdmin ? (
-                <span className="text-muted">You are the organizer</span>
-              ) : (
-                <button
-                  onClick={() => setShowConfirm(true)}
-                  disabled={registering}
-                  className="btn btn-primary btn-lg"
-                >
-                  {registering ? 'Registering...' : 'Register Now'}
-                </button>
-              )}
-
-              {(isOrganizer || isAdmin) && (
-                <Link to={`/edit-event/${event._id}`} className="btn btn-outline btn-lg">
-                  Edit Event
-                </Link>
-              )}
+            <div className="event-detail-back">
+              <Link to="/events" className="back-link">
+                ← Back to Events
+              </Link>
             </div>
           </div>
         </div>
       </div>
-
-      <ConfirmDialog
-        visible={showConfirm}
-        message={`Register for "${event.title}"?`}
-        onConfirm={handleRegister}
-        onCancel={() => setShowConfirm(false)}
-      />
     </div>
   )
 }
