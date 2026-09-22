@@ -10,6 +10,11 @@ export const getMyRegistrations = async () => {
   return data
 }
 
+export const getMyEvents = async () => {
+  const { data } = await api.get('/registrations/my-events')
+  return data
+}
+
 export const getRegistration = async (id) => {
   const { data } = await api.get(`/registrations/${id}`)
   return data
@@ -17,10 +22,5 @@ export const getRegistration = async (id) => {
 
 export const cancelRegistration = async (id) => {
   const { data } = await api.delete(`/registrations/${id}`)
-  return data
-}
-
-export const getMyEvents = async () => {
-  const { data } = await api.get('/registrations/my')
   return data
 }

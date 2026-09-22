@@ -87,6 +87,43 @@ exports.getMyRegistrations = async (req, res, next) => {
   }
 };
 
+exports.getMyEvents = async (req, res, next) => {
+  try {
+    const registrations = await Registration.find({ user: req.user.userId })
+      .populate('event', 'title description category date time location city image status')
+      .sort({ registeredAt: -1 });
+
+    const now = new Date();
+    const upcoming = [];
+    const past = [];
+
+    for (const reg of registrations) {
+      if (reg.event) {
+        const eventDateTime = new Date(`${reg.event.date}T${reg.event.time || '00:00'}`);
+        if (eventDateTime > now && reg.status === 'confirmed') {
+          upcoming.push(reg);
+        } else {
+          past.push(reg);
+        }
+      } else {
+        past.push(reg);
+      }
+    }
+
+    res.json({
+      upcoming,
+      past,
+      count: {
+        upcoming: upcoming.length,
+        past: past.length,
+        total: registrations.length,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.cancelRegistration = async (req, res, next) => {
   try {
     const registration = await Registration.findById(req.params.id);
