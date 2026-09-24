@@ -1,7 +1,7 @@
 import api from './api'
 
-export const getEvents = async (params = {}) => {
-  const { data } = await api.get('/events', { params })
+export const getEvents = async (params = {}, options = {}) => {
+  const { data } = await api.get('/events', { params, ...options })
   return data
 }
 

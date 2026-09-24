@@ -1,20 +1,33 @@
+import { useState, useEffect } from 'react'
 import QRCode from 'qrcode'
 
-export default function Ticket({ registration, event }) {
-  const qrData = JSON.stringify({
-    registrationId: registration._id,
-    ticketNumber: registration.ticketNumber,
-    eventId: event._id,
-  })
+export default function Ticket({ registration, event, qrToken }) {
+  const [qrCodeUrl, setQrCodeUrl] = useState('')
 
-  const qrCodeUrl = QRCode.toDataURL(qrData, {
-    width: 200,
-    margin: 2,
-    color: {
-      dark: '#1e293b',
-      light: '#ffffff',
-    },
-  })
+  useEffect(() => {
+    let cancelled = false
+    const generate = async () => {
+      try {
+        const url = await QRCode.toDataURL(qrToken || JSON.stringify({
+          registrationId: registration._id,
+          ticketNumber: registration.ticketNumber,
+          eventId: event._id,
+        }), {
+          width: 200,
+          margin: 2,
+          color: {
+            dark: '#1e293b',
+            light: '#ffffff',
+          },
+        })
+        if (!cancelled) setQrCodeUrl(url)
+      } catch {
+        if (!cancelled) setQrCodeUrl('')
+      }
+    }
+    generate()
+    return () => { cancelled = true }
+  }, [qrToken, registration._id, registration.ticketNumber, event._id])
 
   const eventDate = new Date(event.date).toLocaleDateString('en-US', {
     weekday: 'long',
@@ -29,7 +42,7 @@ export default function Ticket({ registration, event }) {
         <div className="ticket-left">
           <div className="ticket-header">
             <h2 className="ticket-event-name">{event.title}</h2>
-            <span className="ticket-status ticket-status--{registration.status}">
+            <span className={`ticket-status ticket-status--${registration.status}`}>
               {registration.status}
             </span>
           </div>
@@ -64,7 +77,13 @@ export default function Ticket({ registration, event }) {
 
         <div className="ticket-right">
           <div className="ticket-qr">
-            <img src={qrCodeUrl} alt="QR Code" className="qr-image" />
+            {qrCodeUrl ? (
+              <img src={qrCodeUrl} alt="QR Code" className="qr-image" />
+            ) : (
+              <div className="qr-image" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', width: 200, height: 200, borderRadius: 4 }}>
+                <span style={{ color: '#64748b', fontSize: 14 }}>Loading QR...</span>
+              </div>
+            )}
             <p className="qr-label">Scan at venue</p>
           </div>
         </div>

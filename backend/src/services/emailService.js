@@ -90,7 +90,7 @@ function validateEmail(email) {
   return re.test(email);
 }
 
-async function sendRegistrationConfirmationEmail(user, event, registration, baseUrl) {
+async function sendRegistrationConfirmationEmail(user, event, registration, baseUrl, qrImage) {
   const to = user.email;
   if (!to || !validateEmail(to)) {
     console.warn(`Cannot send registration email: invalid or missing email for user ${user._id}`);
@@ -110,6 +110,7 @@ async function sendRegistrationConfirmationEmail(user, event, registration, base
     ticketNumber: registration.ticketNumber,
     myEventsUrl,
     ticketUrl,
+    qrImage: qrImage || null,
   };
 
   const subject = `Registration Confirmed: ${event.title}`;

@@ -20,7 +20,7 @@ function formatDate(dateString) {
 }
 
 function generateRegistrationConfirmationHtml(data) {
-  const { userName, eventTitle, eventDate, eventTime, eventLocation, eventCity, ticketNumber, myEventsUrl, ticketUrl } = data;
+  const { userName, eventTitle, eventDate, eventTime, eventLocation, eventCity, ticketNumber, myEventsUrl, ticketUrl, qrImage } = data;
 
   const safeUserName = escapeHtml(userName);
   const safeEventTitle = escapeHtml(eventTitle);
@@ -31,6 +31,16 @@ function generateRegistrationConfirmationHtml(data) {
   const safeTicketNumber = escapeHtml(ticketNumber);
   const safeMyEventsUrl = escapeHtml(myEventsUrl);
   const safeTicketUrl = escapeHtml(ticketUrl);
+
+  const qrSection = qrImage
+    ? `<tr>
+        <td style="padding: 0 20px 20px; text-align: center;">
+          <p style="margin: 0 0 12px; font-size: 14px; color: #64748b;"><strong>Your QR Code</strong></p>
+          <img src="${qrImage}" alt="QR Code" style="width: 160px; height: 160px; display: block; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px;" />
+          <p style="margin: 12px 0 0; font-size: 12px; color: #94a3b8;">Scan this code at the venue for check-in</p>
+        </td>
+      </tr>`
+    : '';
 
   return `
 <!DOCTYPE html>
@@ -93,6 +103,8 @@ function generateRegistrationConfirmationHtml(data) {
                   </td>
                 </tr>
               </table>
+
+              ${qrSection}
 
               <p style="margin: 0 0 16px; font-size: 16px; color: #333333;"><strong>Registration Status:</strong> Confirmed</p>
 

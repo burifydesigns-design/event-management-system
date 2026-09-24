@@ -19,6 +19,8 @@ const DEFAULT_FILTERS = {
   sort: 'date_asc'
 }
 
+const EVENTS_REQUEST_TIMEOUT_MS = 15000
+
 export default function Events() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [events, setEvents] = useState([])
@@ -59,18 +61,25 @@ export default function Events() {
   }, [fetchCategoriesAndCities])
 
   const fetchEvents = useCallback(async () => {
+    let controller = null
+    let timeoutId = null
     try {
       setLoading(true)
       setError(null)
+      controller = new AbortController()
+      timeoutId = setTimeout(() => controller.abort(), EVENTS_REQUEST_TIMEOUT_MS)
       const params = { ...filters }
-      const data = await getEvents(params)
+      const data = await getEvents(params, { signal: controller.signal })
       setEvents(data.events || [])
       if (data.pagination) {
         setPagination(data.pagination)
       }
     } catch (err) {
-      setError('Failed to load events. Please try again.')
+      console.error('Failed to load events:', err)
+      setError("Couldn't load events. Please try again.")
     } finally {
+      if (timeoutId) clearTimeout(timeoutId)
+      if (controller) controller.abort()
       setLoading(false)
     }
   }, [filters])
@@ -123,6 +132,9 @@ export default function Events() {
       <div className="page-events">
         <div className="container">
           <ErrorMessage message={error} />
+          <button type="button" onClick={fetchEvents} className="btn btn-primary">
+            Retry
+          </button>
         </div>
       </div>
     )

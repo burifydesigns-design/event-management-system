@@ -28,7 +28,7 @@ export const exportAttendeesCSV = async (eventId) => {
 }
 
 export const scanQR = async (qrToken, eventId) => {
-  const { data } = await api.post('/admin/scan', { qrToken, eventId })
+  const { data } = await api.post('/scan', { qrToken, eventId })
   return data
 }
 

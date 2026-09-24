@@ -2,13 +2,17 @@ const mongoose = require('mongoose');
 const Event = require('../models/Event');
 const Registration = require('../models/Registration');
 const User = require('../models/User');
+const TicketInstance = require('../models/TicketInstance');
 const generateTicketNumber = require('../utils/ticketGenerator');
+const { generateTicketToken, generateQRImage } = require('../services/qrService');
 const { sendRegistrationConfirmationEmail } = require('../services/emailService');
 
 jest.mock('../models/Event');
 jest.mock('../models/Registration');
 jest.mock('../models/User');
+jest.mock('../models/TicketInstance');
 jest.mock('../utils/ticketGenerator');
+jest.mock('../services/qrService');
 jest.mock('../services/emailService');
 
 function createReqResNext(userId) {
@@ -41,7 +45,10 @@ describe('registerForEvent', () => {
     Registration.countDocuments.mockReset();
     Registration.create.mockReset();
     User.findById.mockReset();
+    TicketInstance.create.mockReset();
     generateTicketNumber.mockReset();
+    generateTicketToken.mockReset();
+    generateQRImage.mockReset();
     sendRegistrationConfirmationEmail.mockReset();
 
     const controller = require('../controllers/registrationController');
@@ -125,6 +132,8 @@ describe('registerForEvent', () => {
     Registration.findOne.mockResolvedValue(null);
     Registration.countDocuments.mockResolvedValue(0);
     generateTicketNumber.mockReturnValue('EVT-TEST123');
+    generateTicketToken.mockReturnValue('secure-token-123');
+    generateQRImage.mockResolvedValue('data:image/png;base64,mockqr');
     const mockReg = {
       _id: 'reg1',
       ticketNumber: 'EVT-TEST123',
@@ -139,6 +148,7 @@ describe('registerForEvent', () => {
     Registration.findById.mockReturnValue(mockQuery);
     const mockUser = { _id: 'user1', name: 'Test User', email: 'user@example.com', select: jest.fn().mockReturnThis() };
     User.findById.mockReturnValue(mockUser);
+    TicketInstance.create.mockResolvedValue({ _id: 'ticket1', qrToken: 'secure-token-123' });
     mockedSendEmail.mockResolvedValue({ success: true, messageId: 'msg1' });
 
     const { req, res, next } = createReqResNext('user1');
@@ -150,11 +160,18 @@ describe('registerForEvent', () => {
       event: validId,
       ticketNumber: 'EVT-TEST123',
     });
+    expect(TicketInstance.create).toHaveBeenCalledWith({
+      event: validId,
+      attendee: 'user1',
+      qrToken: 'secure-token-123',
+      status: 'valid',
+    });
     expect(mockedSendEmail).toHaveBeenCalledWith(
       expect.objectContaining({ _id: 'user1', name: 'Test User', email: 'user@example.com' }),
       mockEvent,
       expect.objectContaining({ _id: 'reg1' }),
-      'http://localhost:3000'
+      'http://localhost:3000',
+      'data:image/png;base64,mockqr'
     );
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith(
@@ -190,6 +207,9 @@ describe('registerForEvent', () => {
     const mockUser = { _id: 'user1', name: 'Test User', email: 'user@example.com', select: jest.fn().mockReturnThis() };
     User.findById.mockReturnValue(mockUser);
     generateTicketNumber.mockReturnValue('EVT-NEW123');
+    generateTicketToken.mockReturnValue('secure-token-new');
+    generateQRImage.mockResolvedValue('data:image/png;base64,mockqr2');
+    TicketInstance.create.mockResolvedValue({ _id: 'ticket2', qrToken: 'secure-token-new' });
     mockedSendEmail.mockResolvedValue({ success: true, messageId: 'msg1' });
 
     const { req, res, next } = createReqResNext('user1');
@@ -199,6 +219,12 @@ describe('registerForEvent', () => {
     expect(existingReg.status).toBe('confirmed');
     expect(existingReg.ticketNumber).toBe('EVT-NEW123');
     expect(existingReg.registeredAt).not.toBeNull();
+    expect(TicketInstance.create).toHaveBeenCalledWith({
+      event: validId,
+      attendee: 'user1',
+      qrToken: 'secure-token-new',
+      status: 'valid',
+    });
     expect(mockedSendEmail).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(201);
   });

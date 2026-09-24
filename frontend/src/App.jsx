@@ -31,21 +31,21 @@ function App() {
           <Route path="/events/:id" element={<EventDetails />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route element={<ProtectedRoute />}>
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/create-event" element={<CreateEvent />} />
-            <Route path="/edit-event/:id" element={<EditEvent />} />
-            <Route path="/my-events" element={<MyEvents />} />
-            <Route path="/my-ticket/:registrationId" element={<DigitalTicket />} />
-            <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/admin/events" element={<AdminEvents />} />
-              <Route path="/admin/users" element={<AdminUsers />} />
-              <Route path="/admin/attendees" element={<AdminAttendees />} />
-              <Route path="/admin/check-in" element={<AdminCheckIn />} />
-              <Route path="/admin/analytics" element={<AdminAnalytics />} />
-            </Route>
-          </Route>
+  <Route element={<ProtectedRoute />}>
+    <Route path="/profile" element={<Profile />} />
+    <Route path="/create-event" element={<CreateEvent />} />
+    <Route path="/edit-event/:id" element={<EditEvent />} />
+    <Route path="/my-events" element={<MyEvents />} />
+    <Route path="/my-ticket/:registrationId" element={<DigitalTicket />} />
+    <Route element={<ProtectedRoute allowedRoles={['admin', 'organizer']} />}>
+      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/admin/events" element={<AdminEvents />} />
+      <Route path="/admin/users" element={<AdminUsers />} />
+      <Route path="/admin/attendees" element={<AdminAttendees />} />
+      <Route path="/admin/check-in" element={<AdminCheckIn />} />
+      <Route path="/admin/analytics" element={<AdminAnalytics />} />
+    </Route>
+  </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

@@ -2,7 +2,9 @@ const mongoose = require('mongoose');
 const Event = require('../models/Event');
 const Registration = require('../models/Registration');
 const User = require('../models/User');
+const TicketInstance = require('../models/TicketInstance');
 const generateTicketNumber = require('../utils/ticketGenerator');
+const { generateTicketToken, generateQRImage } = require('../services/qrService');
 const { sendRegistrationConfirmationEmail } = require('../services/emailService');
 
 function getBaseUrl(req) {
@@ -44,13 +46,22 @@ exports.registerForEvent = async (req, res, next) => {
         existingRegistration.checkedInAt = null;
         await existingRegistration.save();
 
+        const qrToken = generateTicketToken();
+        await TicketInstance.create({
+          event: eventId,
+          attendee: req.user.userId,
+          qrToken,
+          status: 'valid',
+        });
+
         const updated = await Registration.findById(existingRegistration._id)
           .populate('user', 'name email')
           .populate('event');
 
         const baseUrl = getBaseUrl(req);
         const user = await User.findById(req.user.userId).select('name email');
-        const emailResult = await sendRegistrationConfirmationEmail(user, event, updated, baseUrl);
+        const qrImage = await generateQRImage(qrToken);
+        const emailResult = await sendRegistrationConfirmationEmail(user, event, updated, baseUrl, qrImage);
 
         return res.status(201).json({
           message: 'Successfully registered for the event.',
@@ -75,13 +86,22 @@ exports.registerForEvent = async (req, res, next) => {
       ticketNumber,
     });
 
+    const qrToken = generateTicketToken();
+    await TicketInstance.create({
+      event: eventId,
+      attendee: req.user.userId,
+      qrToken,
+      status: 'valid',
+    });
+
     const populated = await Registration.findById(registration._id)
       .populate('user', 'name email')
       .populate('event');
 
     const baseUrl = getBaseUrl(req);
     const user = await User.findById(req.user.userId).select('name email');
-    const emailResult = await sendRegistrationConfirmationEmail(user, event, populated, baseUrl);
+    const qrImage = await generateQRImage(qrToken);
+    const emailResult = await sendRegistrationConfirmationEmail(user, event, populated, baseUrl, qrImage);
 
     res.status(201).json({
       message: 'Successfully registered for the event.',
@@ -135,6 +155,33 @@ exports.getMyEvents = async (req, res, next) => {
         past: past.length,
         total: registrations.length,
       },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getRegistration = async (req, res, next) => {
+  try {
+    const registration = await Registration.findById(req.params.id)
+      .populate('user', 'name email')
+      .populate('event');
+    if (!registration) return res.status(404).json({ message: 'Registration not found' });
+
+    if (String(registration.user._id) !== String(req.user.userId) && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    const ticket = await TicketInstance.findOne({
+      attendee: registration.user._id,
+      event: registration.event._id,
+    })
+      .sort({ createdAt: -1 })
+      .select('_id qrToken status scannedAt scannedBy');
+
+    res.json({
+      registration,
+      ticket: ticket || null,
     });
   } catch (err) {
     next(err);

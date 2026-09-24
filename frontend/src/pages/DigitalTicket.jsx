@@ -4,27 +4,20 @@ import { useAuth } from '../context/AuthContext'
 import Loading from '../components/Loading'
 import ErrorMessage from '../components/ErrorMessage'
 import { getRegistration } from '../services/registrationService'
-import { getEvent } from '../services/eventService'
 import Ticket from '../components/Ticket'
 
 export default function DigitalTicket() {
   const { registrationId } = useParams()
   const { user } = useAuth()
-  const [registration, setRegistration] = useState(null)
-  const [event, setEvent] = useState(null)
+  const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const regData = await getRegistration(registrationId)
-        setRegistration(regData)
-
-        if (regData.event?._id) {
-          const eventData = await getEvent(regData.event._id)
-          setEvent(eventData)
-        }
+        const res = await getRegistration(registrationId)
+        setData(res)
       } catch (err) {
         setError('Unable to load ticket. Please try again.')
       } finally {
@@ -37,7 +30,7 @@ export default function DigitalTicket() {
   if (loading) return <Loading text="Loading ticket..." />
   if (error) return <ErrorMessage message={error} />
 
-  if (!registration || !event) {
+  if (!data || !data.registration || !data.registration.event) {
     return (
       <div className="container">
         <div className="empty-state">
@@ -49,6 +42,10 @@ export default function DigitalTicket() {
     )
   }
 
+  const { registration, ticket } = data
+  const event = registration.event
+  const attendeeName = registration.user?.name || user?.name || 'Attendee'
+
   return (
     <div className="page-ticket">
       <div className="container">
@@ -57,7 +54,16 @@ export default function DigitalTicket() {
           <p className="page-subtitle">Present this ticket at the venue</p>
         </div>
 
-        <Ticket registration={registration} event={event} />
+        <Ticket
+          registration={{
+            ...registration,
+            attendeeName,
+            ticketNumber: registration.ticketNumber,
+            status: registration.status,
+          }}
+          event={event}
+          qrToken={ticket?.qrToken}
+        />
 
         <div className="ticket-actions">
           <button
