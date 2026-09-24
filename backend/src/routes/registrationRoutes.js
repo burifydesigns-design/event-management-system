@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const auth = require('../middleware/authMiddleware');
+const { authMiddleware } = require('../middleware/authMiddleware');
 const { validateRegistration } = require('../middleware/validationMiddleware');
 const {
   registerForEvent,
@@ -8,9 +8,9 @@ const {
   cancelRegistration,
 } = require('../controllers/registrationController');
 
-router.post('/', auth, validateRegistration, registerForEvent);
-router.get('/my', auth, getMyRegistrations);
-router.get('/my-events', auth, getMyEvents);
-router.delete('/:id', auth, cancelRegistration);
+router.post('/', authMiddleware, validateRegistration, registerForEvent);
+router.get('/my', authMiddleware, getMyRegistrations);
+router.get('/my-events', authMiddleware, getMyEvents);
+router.delete('/:id', authMiddleware, cancelRegistration);
 
 module.exports = router;

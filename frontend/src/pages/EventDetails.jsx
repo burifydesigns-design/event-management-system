@@ -14,6 +14,7 @@ export default function EventDetails() {
   const [error, setError] = useState(null)
   const [registering, setRegistering] = useState(false)
   const [registrationMessage, setRegistrationMessage] = useState('')
+  const [registrationData, setRegistrationData] = useState(null)
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -21,6 +22,7 @@ export default function EventDetails() {
         setLoading(true)
         setError(null)
         setRegistrationMessage('')
+        setRegistrationData(null)
         const data = await getEvent(id)
         setEvent(data)
       } catch (err) {
@@ -40,8 +42,16 @@ export default function EventDetails() {
     try {
       setRegistering(true)
       setRegistrationMessage('')
+      setRegistrationData(null)
       const response = await registerForEvent(event._id)
-      setRegistrationMessage(response.message || response.registration?.message || 'Successfully registered for the event.')
+      setRegistrationData(response.registration)
+      let message = response.message || 'Successfully registered for the event.'
+      if (response.emailSent === false) {
+        message += ' (Confirmation email could not be sent - please check your spam folder or contact support)'
+      } else if (response.emailSent === true) {
+        message += ' A confirmation email has been sent to your email address.'
+      }
+      setRegistrationMessage(message)
     } catch (error) {
       console.error(error)
       if (error.response?.status === 401) {
@@ -99,6 +109,8 @@ export default function EventDetails() {
     month: 'long',
     day: 'numeric',
   })
+
+  const isSuccess = registrationMessage.toLowerCase().includes('successfully') || registrationMessage.toLowerCase().includes('success')
 
   return (
     <div className="page-event-details">
@@ -187,8 +199,20 @@ export default function EventDetails() {
                   </button>
 
                   {registrationMessage && (
-                    <div className={`registration-message ${registrationMessage.toLowerCase().includes('successfully') || registrationMessage.toLowerCase().includes('success') ? 'registration-message--success' : 'registration-message--error'}`}>
+                    <div className={`registration-message ${isSuccess ? 'registration-message--success' : 'registration-message--error'}`}>
                       {registrationMessage}
+                    </div>
+                  )}
+
+                  {registrationData && isSuccess && (
+                    <div className="registration-confirmation">
+                      <h4>Registration Details</h4>
+                      <p><strong>Ticket Number:</strong> {registrationData.ticketNumber}</p>
+                      <p><strong>Status:</strong> Confirmed</p>
+                      <div className="registration-confirmation-actions">
+                        <Link to="/my-events" className="btn btn-outline btn-sm">View My Events</Link>
+                        <Link to={`/my-ticket/${registrationData._id}`} className="btn btn-primary btn-sm">View Ticket</Link>
+                      </div>
                     </div>
                   )}
                 </div>

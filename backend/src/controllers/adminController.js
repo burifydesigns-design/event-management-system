@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Event = require('../models/Event');
 const Registration = require('../models/Registration');
+const mongoose = require('mongoose');
 
 exports.getDashboard = async (req, res, next) => {
   try {
@@ -28,6 +29,56 @@ exports.getDashboard = async (req, res, next) => {
       upcomingEvents,
       availableSeats,
       checkedInAttendees,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getAllEvents = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 20, status, visibility, search } = req.query;
+
+    const query = {};
+
+    if (req.user.role === 'organizer') {
+      query.organizer = req.user.userId;
+    }
+
+    if (status) query.status = status;
+    if (visibility) query.visibility = visibility;
+
+    if (search) {
+      const sanitizedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').trim();
+      if (sanitizedSearch) {
+        query.$or = [
+          { title: { $regex: sanitizedSearch, $options: 'i' } },
+          { description: { $regex: sanitizedSearch, $options: 'i' } },
+          { city: { $regex: sanitizedSearch, $options: 'i' } },
+          { location: { $regex: sanitizedSearch, $options: 'i' } },
+          { category: { $regex: sanitizedSearch, $options: 'i' } }
+        ];
+      }
+    }
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+
+    const totalEvents = await Event.countDocuments(query);
+    const events = await Event.find(query)
+      .populate('organizer', 'name email')
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum)
+      .sort({ createdAt: -1 });
+
+    res.json({
+      events,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: totalEvents,
+        totalPages: Math.ceil(totalEvents / limitNum)
+      }
     });
   } catch (err) {
     next(err);

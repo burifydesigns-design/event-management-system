@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const auth = require('../middleware/authMiddleware');
+const { authMiddleware } = require('../middleware/authMiddleware');
 const role = require('../middleware/roleMiddleware');
 const {
   createTicketType,
@@ -7,6 +7,6 @@ const {
 } = require('../controllers/ticketController');
 
 router.get('/event/:eventId', listTicketTypesForEvent);
-router.post('/', auth, role('organizer', 'admin'), createTicketType);
+router.post('/', authMiddleware, role('organizer', 'admin'), createTicketType);
 
 module.exports = router;

@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const auth = require('../middleware/authMiddleware');
+const { authMiddleware, optionalAuthMiddleware } = require('../middleware/authMiddleware');
 const { validateEvent } = require('../middleware/validationMiddleware');
 const {
   listEvents,
@@ -11,10 +11,10 @@ const {
 } = require('../controllers/eventController');
 
 router.get('/', listEvents);
-router.get('/:id', getEvent);
-router.post('/', auth, validateEvent, createEvent);
-router.put('/:id', auth, updateEvent);
-router.delete('/:id', auth, deleteEvent);
-router.patch('/:id/publish', auth, publishEvent);
+router.get('/:id', optionalAuthMiddleware, getEvent);
+router.post('/', authMiddleware, validateEvent, createEvent);
+router.put('/:id', authMiddleware, updateEvent);
+router.delete('/:id', authMiddleware, deleteEvent);
+router.patch('/:id/publish', authMiddleware, publishEvent);
 
 module.exports = router;

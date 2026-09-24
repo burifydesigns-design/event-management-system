@@ -15,4 +15,19 @@ async function authMiddleware(req, res, next) {
   }
 }
 
-module.exports = authMiddleware;
+async function optionalAuthMiddleware(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return next();
+  }
+  try {
+    const token = header.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+  } catch (err) {
+    // Ignore invalid tokens for optional auth
+  }
+  next();
+}
+
+module.exports = { authMiddleware, optionalAuthMiddleware };

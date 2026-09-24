@@ -810,6 +810,37 @@ img {
   border-color: var(--primary);
 }
 
+.date-filter-wrapper {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.date-mode-select {
+  min-width: 140px;
+}
+
+.date-preset-select {
+  min-width: 140px;
+}
+
+.date-picker {
+  min-width: 160px;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: white;
+  font-size: 1rem;
+}
+
+.date-picker:focus {
+  border-color: var(--primary);
+}
+
+.sort-select {
+  min-width: 180px;
+}
+
 /* Empty State */
 .empty-state {
   text-align: center;

@@ -5,8 +5,8 @@ export const getDashboard = async () => {
   return data
 }
 
-export const getAllEvents = async () => {
-  const { data } = await api.get('/admin/events')
+export const getAllEvents = async (params = {}) => {
+  const { data } = await api.get('/admin/events', { params })
   return data
 }
 

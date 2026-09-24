@@ -1,33 +1,84 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
-export default function SearchFilters({ onFilterChange, categories = [], cities = [] }) {
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('')
-  const [city, setCity] = useState('')
-  const [dateFilter, setDateFilter] = useState('')
-  const [priceFilter, setPriceFilter] = useState('')
+export default function SearchFilters({ onFilterChange, categories = [], cities = [], initialFilters = {}, onClear }) {
+  const {
+    search = '',
+    category = '',
+    city = '',
+    date = '',
+    price = '',
+    sort = 'date_asc'
+  } = initialFilters
+
+  const [localSearch, setLocalSearch] = useState(search)
+  const [localCategory, setLocalCategory] = useState(category)
+  const [localCity, setLocalCity] = useState(city)
+  const [localDate, setLocalDate] = useState(date)
+  const [localPrice, setLocalPrice] = useState(price)
+  const [localSort, setLocalSort] = useState(sort)
+  const [dateMode, setDateMode] = useState(() => {
+    if (!date) return 'preset'
+    if (date === 'upcoming' || date === 'past') return 'preset'
+    return 'specific'
+  })
+
+  const timeoutRef = useRef(null)
+
+  const emitFilters = () => {
+    const dateValue = dateMode === 'specific' ? localDate : (localDate || '')
+    onFilterChange({
+      search: localSearch,
+      category: localCategory,
+      city: localCity,
+      date: dateValue,
+      price: localPrice,
+      sort: localSort
+    })
+  }
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      onFilterChange({
-        search,
-        category,
-        city,
-        date: dateFilter,
-        price: priceFilter,
-      })
-    }, 300)
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    timeoutRef.current = setTimeout(emitFilters, 300)
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    }
+  }, [localSearch, localCategory, localCity, localDate, localPrice, localSort, dateMode])
 
-    return () => clearTimeout(timer)
-  }, [search, category, city, dateFilter, priceFilter, onFilterChange])
+  useEffect(() => {
+    setLocalSearch(search)
+    setLocalCategory(category)
+    setLocalCity(city)
+    setLocalDate(date)
+    setLocalPrice(price)
+    setLocalSort(sort)
+    if (date === 'upcoming' || date === 'past') {
+      setDateMode('preset')
+    } else if (date) {
+      setDateMode('specific')
+    } else {
+      setDateMode('preset')
+    }
+  }, [search, category, city, date, price, sort])
 
   const handleClear = () => {
-    setSearch('')
-    setCategory('')
-    setCity('')
-    setDateFilter('')
-    setPriceFilter('')
+    setLocalSearch('')
+    setLocalCategory('')
+    setLocalCity('')
+    setLocalDate('')
+    setLocalPrice('')
+    setLocalSort('date_asc')
+    setDateMode('preset')
+    if (onClear) onClear()
   }
+
+  const sortOptions = [
+    { value: 'date_asc', label: 'Date: Soonest First' },
+    { value: 'date_desc', label: 'Date: Latest First' },
+    { value: 'title_asc', label: 'Title: A-Z' },
+    { value: 'title_desc', label: 'Title: Z-A' },
+    { value: 'price_asc', label: 'Price: Low to High' },
+    { value: 'price_desc', label: 'Price: High to Low' }
+  ]
 
   return (
     <div className="search-filters">
@@ -36,15 +87,15 @@ export default function SearchFilters({ onFilterChange, categories = [], cities 
           <input
             type="text"
             placeholder="Search events..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
             className="search-input"
           />
         </div>
 
         <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
+          value={localCategory}
+          onChange={(e) => setLocalCategory(e.target.value)}
           className="filter-select"
         >
           <option value="">All Categories</option>
@@ -56,8 +107,8 @@ export default function SearchFilters({ onFilterChange, categories = [], cities 
         </select>
 
         <select
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
+          value={localCity}
+          onChange={(e) => setLocalCity(e.target.value)}
           className="filter-select"
         >
           <option value="">All Cities</option>
@@ -68,24 +119,59 @@ export default function SearchFilters({ onFilterChange, categories = [], cities 
           ))}
         </select>
 
-        <select
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-          className="filter-select"
-        >
-          <option value="">All Dates</option>
-          <option value="upcoming">Upcoming</option>
-          <option value="past">Past</option>
-        </select>
+        <div className="date-filter-wrapper">
+          <select
+            value={dateMode}
+            onChange={(e) => setDateMode(e.target.value)}
+            className="filter-select date-mode-select"
+          >
+            <option value="preset">All Dates</option>
+            <option value="preset" disabled>── Presets ──</option>
+            <option value="preset" data-preset="upcoming">Upcoming</option>
+            <option value="preset" data-preset="past">Past</option>
+            <option value="specific">Specific Date</option>
+          </select>
+          {dateMode === 'preset' && (
+            <select
+              value={localDate}
+              onChange={(e) => setLocalDate(e.target.value)}
+              className="filter-select date-preset-select"
+            >
+              <option value="">All Dates</option>
+              <option value="upcoming">Upcoming</option>
+              <option value="past">Past</option>
+            </select>
+          )}
+          {dateMode === 'specific' && (
+            <input
+              type="date"
+              value={localDate}
+              onChange={(e) => setLocalDate(e.target.value)}
+              className="filter-select date-picker"
+            />
+          )}
+        </div>
 
         <select
-          value={priceFilter}
-          onChange={(e) => setPriceFilter(e.target.value)}
+          value={localPrice}
+          onChange={(e) => setLocalPrice(e.target.value)}
           className="filter-select"
         >
           <option value="">All Prices</option>
           <option value="free">Free</option>
           <option value="paid">Paid</option>
+        </select>
+
+        <select
+          value={localSort}
+          onChange={(e) => setLocalSort(e.target.value)}
+          className="filter-select sort-select"
+        >
+          {sortOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
         </select>
 
         <button onClick={handleClear} className="btn btn-outline">

@@ -1,7 +1,13 @@
 const mongoose = require('mongoose');
 const Event = require('../models/Event');
 const Registration = require('../models/Registration');
+const User = require('../models/User');
 const generateTicketNumber = require('../utils/ticketGenerator');
+const { sendRegistrationConfirmationEmail } = require('../services/emailService');
+
+function getBaseUrl(req) {
+  return process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+}
 
 exports.registerForEvent = async (req, res, next) => {
   try {
@@ -41,9 +47,15 @@ exports.registerForEvent = async (req, res, next) => {
         const updated = await Registration.findById(existingRegistration._id)
           .populate('user', 'name email')
           .populate('event');
+
+        const baseUrl = getBaseUrl(req);
+        const user = await User.findById(req.user.userId).select('name email');
+        const emailResult = await sendRegistrationConfirmationEmail(user, event, updated, baseUrl);
+
         return res.status(201).json({
           message: 'Successfully registered for the event.',
           registration: updated,
+          emailSent: emailResult.success,
         });
       }
     }
@@ -67,9 +79,14 @@ exports.registerForEvent = async (req, res, next) => {
       .populate('user', 'name email')
       .populate('event');
 
+    const baseUrl = getBaseUrl(req);
+    const user = await User.findById(req.user.userId).select('name email');
+    const emailResult = await sendRegistrationConfirmationEmail(user, event, populated, baseUrl);
+
     res.status(201).json({
       message: 'Successfully registered for the event.',
       registration: populated,
+      emailSent: emailResult.success,
     });
   } catch (err) {
     next(err);
