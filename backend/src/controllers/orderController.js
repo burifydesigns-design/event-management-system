@@ -12,7 +12,7 @@ exports.createOrder = async (req, res, next) => {
 
     const totalAmount = ticketType.price * quantity;
     const order = await Order.create({
-      attendee: req.user._id,
+      attendee: req.user.userId,
       event: eventId,
       totalAmount,
       status: 'paid', // TODO: set to 'pending' once paymentService is wired up
@@ -25,7 +25,7 @@ exports.createOrder = async (req, res, next) => {
         order: order._id,
         ticketType: ticketType._id,
         event: eventId,
-        attendee: req.user._id,
+        attendee: req.user.userId,
         qrToken,
       });
       const qrImage = await generateQRImage(qrToken);
@@ -43,7 +43,7 @@ exports.createOrder = async (req, res, next) => {
 
 exports.myTickets = async (req, res, next) => {
   try {
-    const tickets = await TicketInstance.find({ attendee: req.user._id }).populate('event ticketType');
+    const tickets = await TicketInstance.find({ attendee: req.user.userId }).populate('event ticketType');
     res.json(tickets);
   } catch (err) {
     next(err);

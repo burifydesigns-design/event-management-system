@@ -5,3 +5,7 @@ node_modules/
 dist/
 build/
 security-audits/
+
+.vercel
+.env.*
+!.env.example

@@ -1,5 +1,6 @@
 const Event = require('../models/Event');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 
 const today = () => {
   const d = new Date();
@@ -13,12 +14,23 @@ const escapeRegex = (string) => {
 
 const parseDate = (dateString) => {
   if (!dateString) return null;
-  // Parse as UTC to avoid timezone issues
   const [year, month, day] = dateString.split('-').map(Number);
   if (!year || !month || !day) return null;
   const date = new Date(Date.UTC(year, month - 1, day));
   if (isNaN(date.getTime())) return null;
   return date;
+};
+
+const extractUserFromHeader = (req) => {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) return null;
+  try {
+    const token = header.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return { userId: decoded.userId, role: decoded.role };
+  } catch {
+    return null;
+  }
 };
 
 exports.listEvents = async (req, res, next) => {
@@ -116,8 +128,9 @@ exports.getEvent = async (req, res, next) => {
     if (!event) return res.status(404).json({ message: 'Event not found' });
 
     const isPublicPublished = event.status === 'published' && event.visibility === 'public';
-    const isOwner = req.user && String(event.organizer._id) === String(req.user.userId);
-    const isAdmin = req.user && req.user.role === 'admin';
+    const user = extractUserFromHeader(req);
+    const isOwner = user && String(event.organizer._id) === String(user.userId);
+    const isAdmin = user && user.role === 'admin';
 
     if (!isPublicPublished && !isOwner && !isAdmin) {
       return res.status(404).json({ message: 'Event not found' });

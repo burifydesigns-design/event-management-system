@@ -16,6 +16,10 @@ const userSchema = new mongoose.Schema(
       enum: ['attendee', 'organizer', 'admin'],
       default: 'attendee',
     },
+    notificationPreferences: {
+      reminder24h: { type: Boolean, default: true },
+      reminder1h: { type: Boolean, default: true },
+    },
   },
   { timestamps: true }
 );

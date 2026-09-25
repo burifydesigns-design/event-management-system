@@ -5,8 +5,7 @@ import Loading from '../components/Loading'
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { getMyEvents } from '../services/registrationService'
-import { cancelRegistration } from '../services/registrationService'
+import { getMyEvents, updateNotificationPreferences, cancelRegistration } from '../services/registrationService'
 import '../styles/my-events.css'
 
 function formatDateTime(dateStr, timeStr) {
@@ -22,7 +21,7 @@ function formatDateTime(dateStr, timeStr) {
   })
 }
 
-function RegistrationCard({ reg, onCancel }) {
+function RegistrationCard({ reg, onCancel, preferences, onPreferenceChange, savingPreferences }) {
   const event = reg.event
   const imageUrl = event?.image || ''
   const eventTitle = event?.title || 'Event no longer available'
@@ -57,6 +56,29 @@ function RegistrationCard({ reg, onCancel }) {
           <span className="registration-card-meta-item">🎫 #{ticketNumber}</span>
         </div>
 
+        <div className="registration-card-reminders">
+          <label className="toggle-label">
+            <span className="toggle-text">24h reminder</span>
+            <input
+              type="checkbox"
+              checked={preferences.reminder24h}
+              onChange={(e) => onPreferenceChange('reminder24h', e.target.checked)}
+              disabled={savingPreferences}
+            />
+            <span className="toggle-slider" aria-hidden="true" />
+          </label>
+          <label className="toggle-label">
+            <span className="toggle-text">1h reminder</span>
+            <input
+              type="checkbox"
+              checked={preferences.reminder1h}
+              onChange={(e) => onPreferenceChange('reminder1h', e.target.checked)}
+              disabled={savingPreferences}
+            />
+            <span className="toggle-slider" aria-hidden="true" />
+          </label>
+        </div>
+
         <div className="registration-card-actions">
           <Link to={`/events/${event?._id || ''}`} className="btn btn-outline btn-sm">
             View Event
@@ -84,6 +106,54 @@ export default function MyEvents() {
   const [cancelId, setCancelId] = useState(null)
   const [cancelling, setCancelling] = useState(false)
   const [activeTab, setActiveTab] = useState('upcoming')
+  const [preferences, setPreferences] = useState({
+    reminder24h: true,
+    reminder1h: true,
+  })
+  const [savingPreferences, setSavingPreferences] = useState(false)
+
+  useEffect(() => {
+    const fetchRegistrations = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const data = await getMyEvents()
+        setRegistrations({
+          upcoming: data.upcoming || [],
+          past: data.past || [],
+        })
+      } catch (err) {
+        setError('Unable to load your events. Please try again.')
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchRegistrations()
+  }, [])
+
+  useEffect(() => {
+    if (user?.notificationPreferences) {
+      setPreferences({
+        reminder24h: user.notificationPreferences.reminder24h !== false,
+        reminder1h: user.notificationPreferences.reminder1h !== false,
+      })
+    }
+  }, [user])
+
+  const handlePreferenceChange = async (key, value) => {
+    const next = { ...preferences, [key]: value }
+    setPreferences(next)
+    try {
+      setSavingPreferences(true)
+      await updateNotificationPreferences({ [key]: value })
+      setSuccess('Notification preferences updated.')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update preferences.')
+      setPreferences({ ...preferences })
+    } finally {
+      setSavingPreferences(false)
+    }
+  }
 
   useEffect(() => {
     const fetchRegistrations = async () => {
@@ -170,7 +240,7 @@ export default function MyEvents() {
         ) : (
           <div className="registrations-list">
             {displayList.map((reg) => (
-              <RegistrationCard key={reg._id} reg={reg} onCancel={setCancelId} />
+              <RegistrationCard key={reg._id} reg={reg} onCancel={setCancelId} preferences={preferences} onPreferenceChange={handlePreferenceChange} savingPreferences={savingPreferences} />
             ))}
           </div>
         )}

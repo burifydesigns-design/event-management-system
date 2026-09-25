@@ -12,7 +12,14 @@ export default function EventCard({ event }) {
   return (
     <div className="event-card">
       <div className="event-card-image">
-        <img src={imageUrl} alt={event.title} loading="lazy" />
+        <img
+          src={imageUrl}
+          alt={event.title}
+          loading="lazy"
+          onError={(e) => {
+            e.target.src = 'https://via.placeholder.com/400x250?text=No+Image'
+          }}
+        />
         <span className="event-card-badge">{event.category}</span>
       </div>
       <div className="event-card-content">

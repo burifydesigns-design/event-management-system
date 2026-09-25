@@ -4,12 +4,13 @@ import Loading from '../components/Loading'
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import { getAllEvents } from '../services/adminService'
-import { getEventAttendees, exportAttendeesCSV } from '../services/adminService'
+import { getEventAttendees, exportAttendeesCSV, getEventReminderStats } from '../services/adminService'
 
 export default function AdminAttendees() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [events, setEvents] = useState([])
   const [attendees, setAttendees] = useState([])
+  const [reminderStats, setReminderStats] = useState(null)
   const [selectedEventId, setSelectedEventId] = useState(searchParams.get('eventId') || '')
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
@@ -42,6 +43,16 @@ export default function AdminAttendees() {
         }
       }
       fetchAttendees()
+
+      const fetchReminderStats = async () => {
+        try {
+          const data = await getEventReminderStats(selectedEventId)
+          setReminderStats(data.data || data || null)
+        } catch (err) {
+          setReminderStats(null)
+        }
+      }
+      fetchReminderStats()
     }
   }, [selectedEventId])
 
@@ -111,6 +122,23 @@ export default function AdminAttendees() {
             >
               {exporting ? 'Exporting...' : 'Export CSV'}
             </button>
+          </div>
+        )}
+
+        {selectedEventId && reminderStats && (
+          <div className="reminder-stats">
+            <h3>Reminder Status</h3>
+            <div className="reminder-stats-grid">
+              {reminderStats.reminders?.map((r) => (
+                <div key={r._id} className="reminder-stat-card">
+                  <p className="reminder-stat-label">{r._id === '24h' ? '24-Hour Reminder' : '1-Hour Reminder'}</p>
+                  <p className="reminder-stat-value">Sent: {r.sent || 0}</p>
+                  <p className="reminder-stat-value">Pending: {r.pending || 0}</p>
+                  <p className="reminder-stat-value">Failed: {r.failed || 0}</p>
+                  <p className="reminder-stat-value">Skipped: {r.skipped || 0}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

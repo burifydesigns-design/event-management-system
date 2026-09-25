@@ -24,3 +24,13 @@ export const cancelRegistration = async (id) => {
   const { data } = await api.delete(`/registrations/${id}`)
   return data
 }
+
+export const getMyReminders = async () => {
+  const { data } = await api.get('/reminders/my')
+  return data
+}
+
+export const updateNotificationPreferences = async (preferences) => {
+  const { data } = await api.put('/reminders/preferences', preferences)
+  return data
+}

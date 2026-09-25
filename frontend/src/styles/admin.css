@@ -244,3 +244,37 @@
     grid-template-columns: 1fr;
   }
 }
+
+.reminder-stats {
+  margin-top: 1.5rem;
+}
+
+.reminder-stats h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.reminder-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.reminder-stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+}
+
+.reminder-stat-label {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.reminder-stat-value {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0.25rem 0;
+}

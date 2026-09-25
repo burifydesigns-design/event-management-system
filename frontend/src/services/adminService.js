@@ -46,3 +46,8 @@ export const deleteUser = async (userId) => {
   const { data } = await api.delete(`/admin/users/${userId}`)
   return data
 }
+
+export const getEventReminderStats = async (eventId) => {
+  const { data } = await api.get(`/reminders/events/${eventId}`)
+  return data
+}

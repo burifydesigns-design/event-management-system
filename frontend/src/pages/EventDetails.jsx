@@ -110,6 +110,11 @@ export default function EventDetails() {
     day: 'numeric',
   })
 
+  const isPastEvent = new Date(event.date) < new Date()
+  const isCancelled = event.status === 'cancelled'
+  const isNotPublished = event.status !== 'published'
+  const canRegister = !isPastEvent && !isCancelled && !isNotPublished
+
   const isSuccess = registrationMessage.toLowerCase().includes('successfully') || registrationMessage.toLowerCase().includes('success')
 
   return (
@@ -193,9 +198,9 @@ export default function EventDetails() {
                     type="button"
                     className="btn btn-primary btn-block btn-lg"
                     onClick={handleRegister}
-                    disabled={registering}
+                    disabled={registering || !canRegister}
                   >
-                    {registering ? 'Registering...' : 'Register for Event'}
+                    {registering ? 'Registering...' : isCancelled ? 'Event Cancelled' : isPastEvent ? 'Event Has Ended' : isNotPublished ? 'Event Not Published' : 'Register for Event'}
                   </button>
 
                   {registrationMessage && (

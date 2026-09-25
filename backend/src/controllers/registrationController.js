@@ -6,6 +6,7 @@ const TicketInstance = require('../models/TicketInstance');
 const generateTicketNumber = require('../utils/ticketGenerator');
 const { generateTicketToken, generateQRImage } = require('../services/qrService');
 const { sendRegistrationConfirmationEmail } = require('../services/emailService');
+const { createRemindersForRegistration } = require('../services/reminderService');
 
 function getBaseUrl(req) {
   return process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
@@ -62,6 +63,7 @@ exports.registerForEvent = async (req, res, next) => {
         const user = await User.findById(req.user.userId).select('name email');
         const qrImage = await generateQRImage(qrToken);
         const emailResult = await sendRegistrationConfirmationEmail(user, event, updated, baseUrl, qrImage);
+        await createRemindersForRegistration(updated, event);
 
         return res.status(201).json({
           message: 'Successfully registered for the event.',
@@ -102,6 +104,7 @@ exports.registerForEvent = async (req, res, next) => {
     const user = await User.findById(req.user.userId).select('name email');
     const qrImage = await generateQRImage(qrToken);
     const emailResult = await sendRegistrationConfirmationEmail(user, event, populated, baseUrl, qrImage);
+    await createRemindersForRegistration(populated, event);
 
     res.status(201).json({
       message: 'Successfully registered for the event.',
@@ -136,7 +139,9 @@ exports.getMyEvents = async (req, res, next) => {
 
     for (const reg of registrations) {
       if (reg.event) {
-        const eventDateTime = new Date(`${reg.event.date}T${reg.event.time || '00:00'}`);
+        const eventDate = reg.event.date ? new Date(reg.event.date).toISOString().split('T')[0] : '';
+        const eventTime = reg.event.time || '00:00';
+        const eventDateTime = new Date(`${eventDate}T${eventTime}`);
         if (eventDateTime > now && reg.status === 'confirmed') {
           upcoming.push(reg);
         } else {

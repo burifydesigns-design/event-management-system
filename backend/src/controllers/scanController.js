@@ -1,53 +1,91 @@
 const TicketInstance = require('../models/TicketInstance');
 const Registration = require('../models/Registration');
 const Event = require('../models/Event');
+const mongoose = require('mongoose');
 
 exports.scanTicket = async (req, res, next) => {
   try {
     const { qrToken, eventId } = req.body;
 
-    if (!qrToken || !eventId) {
-      return res.status(400).json({ valid: false, message: 'QR token and event ID are required' });
+    if (!qrToken || !eventId || !mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ valid: false, message: 'QR token and valid event ID are required' });
     }
 
-    const ticketQuery = await TicketInstance.findOne({ qrToken });
-    if (!ticketQuery) {
-      return res.status(404).json({ valid: false, message: 'Ticket not found' });
-    }
-
-    const ticket = await ticketQuery
-      .populate('event', 'title status organizer')
-      .populate('attendee', 'name email');
-
-    if (String(ticket.event._id) !== String(eventId)) {
-      return res.status(400).json({ valid: false, message: 'Ticket is for a different event' });
-    }
-
-    if (ticket.status === 'void') {
-      return res.status(400).json({ valid: false, message: 'Ticket is void' });
-    }
-
-    if (ticket.status === 'used') {
-      return res.status(400).json({ valid: false, message: 'Ticket already checked in', checkedInAt: ticket.scannedAt });
-    }
-
-    const event = ticket.event;
+    const event = await Event.findById(eventId);
+    if (!event) return res.status(404).json({ valid: false, message: 'Event not found' });
     if (event.status === 'cancelled') {
       return res.status(400).json({ valid: false, message: 'Event has been cancelled' });
     }
 
-    const registration = await Registration.findOne({
+    if (req.user.role === 'organizer' && String(event.organizer) !== String(req.user.userId)) {
+      return res.status(403).json({ valid: false, message: 'Not authorized for this event' });
+    }
+
+    let registration = null;
+    let ticket = null;
+
+    try {
+      const parsed = JSON.parse(qrToken);
+      if (parsed.registrationId && parsed.ticketNumber) {
+        registration = await Registration.findOne({
+          _id: parsed.registrationId,
+          ticketNumber: parsed.ticketNumber,
+          event: eventId,
+        }).populate('user', 'name email');
+      }
+    } catch {
+      registration = await Registration.findOne({
+        ticketNumber: qrToken,
+        event: eventId,
+      }).populate('user', 'name email');
+    }
+
+    if (registration) {
+      if (registration.status === 'cancelled') {
+        return res.status(400).json({ valid: false, message: 'Ticket is void' });
+      }
+      if (registration.checkedIn) {
+        return res.status(400).json({ valid: false, message: 'Ticket already checked in', checkedInAt: registration.checkedInAt });
+      }
+
+      registration.checkedIn = true;
+      registration.checkedInAt = new Date();
+      await registration.save();
+
+      return res.json({
+        valid: true,
+        message: 'Check-in successful',
+        attendeeName: registration.user?.name || 'N/A',
+        attendeeEmail: registration.user?.email || 'N/A',
+        ticketNumber: registration.ticketNumber,
+        checkedInAt: registration.checkedInAt,
+        eventTitle: event.title,
+      });
+    }
+
+    ticket = await TicketInstance.findOne({ qrToken }).populate('attendee', 'name email');
+    if (!ticket) {
+      return res.status(404).json({ valid: false, message: 'Ticket not found' });
+    }
+
+    if (String(ticket.event) !== String(eventId)) {
+      return res.status(400).json({ valid: false, message: 'Ticket is for a different event' });
+    }
+    if (ticket.status === 'void') {
+      return res.status(400).json({ valid: false, message: 'Ticket is void' });
+    }
+    if (ticket.status === 'used') {
+      return res.status(400).json({ valid: false, message: 'Ticket already checked in', checkedInAt: ticket.scannedAt });
+    }
+
+    const reg = await Registration.findOne({
       user: ticket.attendee._id,
       event: event._id,
       status: 'confirmed',
     });
 
-    if (!registration) {
+    if (!reg) {
       return res.status(400).json({ valid: false, message: 'Registration not found or cancelled' });
-    }
-
-    if (req.user.role === 'organizer' && String(event.organizer) !== String(req.user.userId)) {
-      return res.status(403).json({ valid: false, message: 'Not authorized for this event' });
     }
 
     const updated = await TicketInstance.findOneAndUpdate(
@@ -60,13 +98,18 @@ exports.scanTicket = async (req, res, next) => {
       return res.status(400).json({ valid: false, message: 'Ticket already checked in' });
     }
 
-    res.status(200).json({
+    reg.checkedIn = true;
+    reg.checkedInAt = new Date();
+    await reg.save();
+
+    res.json({
       valid: true,
       message: 'Check-in successful',
       attendeeName: ticket.attendee.name,
       attendeeEmail: ticket.attendee.email,
-      ticketNumber: registration.ticketNumber,
+      ticketNumber: reg.ticketNumber,
       checkedInAt: updated.scannedAt,
+      eventTitle: event.title,
     });
   } catch (err) {
     next(err);
