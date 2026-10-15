@@ -1,16 +1,20 @@
 const router = require('express').Router();
 const auth = require('../middleware/authMiddleware');
-const role = require('../middleware/roleMiddleware');
+const { validateEvent } = require('../middleware/validationMiddleware');
 const {
-  createEvent,
   listEvents,
   getEvent,
+  createEvent,
+  updateEvent,
   deleteEvent,
+  publishEvent,
 } = require('../controllers/eventController');
 
-router.get('/', listEvents); // public browsing
+router.get('/', listEvents);
 router.get('/:id', getEvent);
-router.post('/', auth, role('organizer', 'admin'), createEvent);
-router.delete('/:id', auth, role('organizer', 'admin'), deleteEvent);
+router.post('/', auth, validateEvent, createEvent);
+router.put('/:id', auth, updateEvent);
+router.delete('/:id', auth, deleteEvent);
+router.patch('/:id/publish', auth, publishEvent);
 
 module.exports = router;
