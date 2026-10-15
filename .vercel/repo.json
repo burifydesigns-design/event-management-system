@@ -1,0 +1,11 @@
+{
+  "remoteName": "origin",
+  "projects": [
+    {
+      "id": "prj_lO0NZJ7DVd6UkL3CLS8FM9fFuVH6",
+      "name": "event-management-system",
+      "directory": ".",
+      "orgId": "team_UZf8ahbYKbRoYAGOQJFQAIxd"
+    }
+  ]
+}
