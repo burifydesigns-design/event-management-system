@@ -32,8 +32,13 @@ export const scanQR = async (qrToken, eventId) => {
   return data
 }
 
-export const getAnalytics = async () => {
-  const { data } = await api.get('/admin/analytics')
+export const getAnalytics = async (params = {}) => {
+  const { data } = await api.get('/admin/analytics', { params })
+  return data
+}
+
+export const getOrganizerAnalytics = async (params = {}) => {
+  const { data } = await api.get('/admin/organizer/analytics', { params })
   return data
 }
 

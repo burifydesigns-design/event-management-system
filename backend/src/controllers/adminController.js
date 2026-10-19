@@ -41,6 +41,62 @@ function buildEventFilter(queryParams) {
   return { filter };
 }
 
+function parseDateRange(query) {
+  const { startDate, endDate, range } = query;
+  const now = new Date();
+  now.setHours(23, 59, 59, 999);
+
+  let start, end = now;
+
+  if (range && !startDate && !endDate) {
+    switch (range) {
+      case '7d':
+        start = new Date(now);
+        start.setDate(start.getDate() - 7);
+        start.setHours(0, 0, 0, 0);
+        break;
+      case '30d':
+        start = new Date(now);
+        start.setDate(start.getDate() - 30);
+        start.setHours(0, 0, 0, 0);
+        break;
+      case '90d':
+        start = new Date(now);
+        start.setDate(start.getDate() - 90);
+        start.setHours(0, 0, 0, 0);
+        break;
+      case 'all':
+      default:
+        start = new Date(0);
+        break;
+    }
+  } else {
+    if (startDate) {
+      start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+    } else {
+      start = new Date(0);
+    }
+    if (endDate) {
+      end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+    }
+  }
+
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    return { error: 'Invalid date format' };
+  }
+  if (start > end) {
+    return { error: 'Start date must be before end date' };
+  }
+
+  return { start, end };
+}
+
+function buildRegistrationDateFilter(start, end, field = 'registeredAt') {
+  return { [field]: { $gte: start, $lte: end } };
+}
+
 exports.getDashboard = async (req, res, next) => {
   try {
     const today = new Date();
@@ -195,7 +251,12 @@ exports.exportEventAttendees = async (req, res, next) => {
 
 exports.getAnalytics = async (req, res, next) => {
   try {
+    const dateRange = parseDateRange(req.query);
+    if (dateRange.error) return res.status(400).json({ message: dateRange.error });
+    const { start, end } = dateRange;
+
     const registrationsOverTime = await Registration.aggregate([
+      { $match: buildRegistrationDateFilter(start, end) },
       {
         $group: {
           _id: { $dateToString: { format: '%Y-%m-%d', date: '$registeredAt' } },
@@ -206,25 +267,59 @@ exports.getAnalytics = async (req, res, next) => {
     ]);
 
     const registrationsPerEvent = await Registration.aggregate([
-      { $match: { status: 'confirmed' } },
+      { $match: { status: 'confirmed', registeredAt: { $gte: start, $lte: end } } },
       {
         $group: {
           _id: '$event',
           count: { $sum: 1 },
         },
       },
+      {
+        $lookup: {
+          from: 'events',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'event',
+        },
+      },
+      { $unwind: '$event' },
+      {
+        $project: {
+          eventId: '$_id',
+          eventName: '$event.title',
+          count: 1,
+        },
+      },
+      { $sort: { count: -1 } },
     ]);
 
-    const totalConfirmed = await Registration.countDocuments({ status: 'confirmed' });
-    const totalCheckedIn = await Registration.countDocuments({ checkedIn: true });
-    const checkInRate = totalConfirmed > 0 ? (totalCheckedIn / totalConfirmed) * 100 : 0;
+    const totalConfirmed = await Registration.countDocuments({
+      status: 'confirmed',
+      registeredAt: { $gte: start, $lte: end },
+    });
+    const totalCheckedIn = await Registration.countDocuments({
+      checkedIn: true,
+      checkedInAt: { $gte: start, $lte: end },
+    });
+    const checkInRate = totalConfirmed > 0 ? Math.round((totalCheckedIn / totalConfirmed) * 100) : 0;
 
     const capacityUtilization = await Event.aggregate([
       {
         $lookup: {
           from: 'registrations',
-          localField: '_id',
-          foreignField: 'event',
+          let: { eventId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$event', '$$eventId'] },
+                    { $in: ['$status', ACTIVE_REGISTRATION_STATUSES] },
+                  ],
+                },
+              },
+            },
+          ],
           as: 'registrations',
         },
       },
@@ -242,13 +337,212 @@ exports.getAnalytics = async (req, res, next) => {
           },
         },
       },
+      { $sort: { utilization: -1 } },
     ]);
 
+    const eventStatusCounts = await Event.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]);
+
+    const summary = {
+      totalEvents: await Event.countDocuments(),
+      upcomingEvents: await Event.countDocuments({ status: 'published', date: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) } }),
+      pastEvents: await Event.countDocuments({ status: { $ne: 'cancelled' }, date: { $lt: new Date(new Date().setHours(0, 0, 0, 0)) } }),
+      totalRegistrations: await Registration.countDocuments({ registeredAt: { $gte: start, $lte: end } }),
+      activeRegistrations: await Registration.countDocuments({ status: { $in: ACTIVE_REGISTRATION_STATUSES }, registeredAt: { $gte: start, $lte: end } }),
+      checkedInAttendees: totalCheckedIn,
+      checkInRate,
+      eventStatusCounts,
+    };
+
     res.json({
+      summary,
       registrationsOverTime,
       registrationsPerEvent,
-      checkInRate,
       capacityUtilization,
+      dateRange: { start: start.toISOString(), end: end.toISOString() },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getOrganizerAnalytics = async (req, res, next) => {
+  try {
+    const dateRange = parseDateRange(req.query);
+    if (dateRange.error) return res.status(400).json({ message: dateRange.error });
+    const { start, end } = dateRange;
+
+    const organizerId = req.user._id;
+
+    const organizerEvents = await Event.find({ organizer: organizerId }).select('_id').lean();
+    const organizerEventIds = organizerEvents.map(e => e._id);
+
+    if (organizerEventIds.length === 0) {
+      return res.json({
+        summary: {
+          totalEvents: 0,
+          upcomingEvents: 0,
+          pastEvents: 0,
+          totalRegistrations: 0,
+          activeRegistrations: 0,
+          checkedInAttendees: 0,
+          checkInRate: 0,
+          eventStatusCounts: [],
+        },
+        registrationsOverTime: [],
+        registrationsPerEvent: [],
+        capacityUtilization: [],
+        topEvents: [],
+        dateRange: { start: start.toISOString(), end: end.toISOString() },
+      });
+    }
+
+    const registrationsOverTime = await Registration.aggregate([
+      { $match: { event: { $in: organizerEventIds }, ...buildRegistrationDateFilter(start, end) } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$registeredAt' } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const registrationsPerEvent = await Registration.aggregate([
+      {
+        $match: {
+          event: { $in: organizerEventIds },
+          status: 'confirmed',
+          registeredAt: { $gte: start, $lte: end },
+        },
+      },
+      {
+        $group: {
+          _id: '$event',
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $lookup: {
+          from: 'events',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'event',
+        },
+      },
+      { $unwind: '$event' },
+      {
+        $project: {
+          eventId: '$_id',
+          eventName: '$event.title',
+          eventDate: '$event.date',
+          eventStatus: '$event.status',
+          capacity: '$event.capacity',
+          count: 1,
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+
+    const totalConfirmed = await Registration.countDocuments({
+      event: { $in: organizerEventIds },
+      status: 'confirmed',
+      registeredAt: { $gte: start, $lte: end },
+    });
+    const totalCheckedIn = await Registration.countDocuments({
+      event: { $in: organizerEventIds },
+      checkedIn: true,
+      checkedInAt: { $gte: start, $lte: end },
+    });
+    const checkInRate = totalConfirmed > 0 ? Math.round((totalCheckedIn / totalConfirmed) * 100) : 0;
+
+    const capacityUtilization = await Event.aggregate([
+      { $match: { _id: { $in: organizerEventIds } } },
+      {
+        $lookup: {
+          from: 'registrations',
+          let: { eventId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$event', '$$eventId'] },
+                    { $in: ['$status', ACTIVE_REGISTRATION_STATUSES] },
+                  ],
+                },
+              },
+            },
+          ],
+          as: 'registrations',
+        },
+      },
+      {
+        $project: {
+          title: 1,
+          capacity: 1,
+          registered: { $size: '$registrations' },
+          utilization: {
+            $cond: [
+              { $eq: ['$capacity', 0] },
+              0,
+              { $multiply: [{ $divide: [{ $size: '$registrations' }, '$capacity'] }, 100] },
+            ],
+          },
+        },
+      },
+      { $sort: { utilization: -1 } },
+    ]);
+
+    const eventStatusCounts = await Event.aggregate([
+      { $match: { _id: { $in: organizerEventIds } } },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const upcomingEvents = await Event.countDocuments({
+      _id: { $in: organizerEventIds },
+      status: 'published',
+      date: { $gte: today },
+    });
+
+    const pastEvents = await Event.countDocuments({
+      _id: { $in: organizerEventIds },
+      status: { $ne: 'cancelled' },
+      date: { $lt: today },
+    });
+
+    const topEvents = registrationsPerEvent.slice(0, 5).map(e => ({
+      eventId: e.eventId,
+      eventName: e.eventName,
+      eventDate: e.eventDate,
+      eventStatus: e.eventStatus,
+      registrations: e.count,
+      capacity: e.capacity,
+      occupancyRate: e.capacity > 0 ? Math.round((e.count / e.capacity) * 100) : 0,
+    }));
+
+    const summary = {
+      totalEvents: organizerEventIds.length,
+      upcomingEvents,
+      pastEvents,
+      totalRegistrations: await Registration.countDocuments({ event: { $in: organizerEventIds }, registeredAt: { $gte: start, $lte: end } }),
+      activeRegistrations: await Registration.countDocuments({ event: { $in: organizerEventIds }, status: { $in: ACTIVE_REGISTRATION_STATUSES }, registeredAt: { $gte: start, $lte: end } }),
+      checkedInAttendees: totalCheckedIn,
+      checkInRate,
+      eventStatusCounts,
+    };
+
+    res.json({
+      summary,
+      registrationsOverTime,
+      registrationsPerEvent,
+      capacityUtilization,
+      topEvents,
+      dateRange: { start: start.toISOString(), end: end.toISOString() },
     });
   } catch (err) {
     next(err);

@@ -31,7 +31,11 @@ export default function Navbar() {
       { to: '/admin/attendees', label: 'Attendees' },
       { to: '/admin/check-in', label: 'Check-In' },
       { to: '/admin/users', label: 'Users' },
+      { to: '/admin/analytics', label: 'Analytics' },
     )
+  }
+  if (user?.role === 'organizer') {
+    navLinks.push({ to: '/organizer/analytics', label: 'Analytics' })
   }
 
   return (

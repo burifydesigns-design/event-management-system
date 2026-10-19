@@ -6,6 +6,7 @@ const {
   getEventAttendees,
   exportEventAttendees,
   getAnalytics,
+  getOrganizerAnalytics,
   getAllEvents,
   getAllUsers,
   updateUserRole,
@@ -20,5 +21,6 @@ router.delete('/users/:id', auth, role('admin'), deleteUser);
 router.get('/events/:eventId/attendees', auth, role('admin'), getEventAttendees);
 router.get('/events/:eventId/attendees/export', auth, role('admin'), exportEventAttendees);
 router.get('/analytics', auth, role('admin'), getAnalytics);
+router.get('/organizer/analytics', auth, role('organizer', 'admin'), getOrganizerAnalytics);
 
 module.exports = router;

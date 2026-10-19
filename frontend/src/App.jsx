@@ -18,6 +18,7 @@ import AdminUsers from './pages/AdminUsers'
 import AdminAttendees from './pages/AdminAttendees'
 import AdminCheckIn from './pages/AdminCheckIn'
 import AdminAnalytics from './pages/AdminAnalytics'
+import OrganizerAnalytics from './pages/OrganizerAnalytics'
 import DigitalTicket from './pages/DigitalTicket'
 import './styles/admin.css'
 
@@ -45,6 +46,9 @@ function App() {
               <Route path="/admin/attendees" element={<AdminAttendees />} />
               <Route path="/admin/check-in" element={<AdminCheckIn />} />
               <Route path="/admin/analytics" element={<AdminAnalytics />} />
+            </Route>
+            <Route element={<ProtectedRoute allowedRoles={['organizer', 'admin']} />}>
+              <Route path="/organizer/analytics" element={<OrganizerAnalytics />} />
             </Route>
           </Route>
           <Route path="*" element={<NotFound />} />
