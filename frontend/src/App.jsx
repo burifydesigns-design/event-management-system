@@ -19,6 +19,7 @@ import AdminAttendees from './pages/AdminAttendees'
 import AdminCheckIn from './pages/AdminCheckIn'
 import AdminAnalytics from './pages/AdminAnalytics'
 import DigitalTicket from './pages/DigitalTicket'
+import './styles/admin.css'
 
 function App() {
   return (

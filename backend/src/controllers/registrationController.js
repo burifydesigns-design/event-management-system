@@ -4,6 +4,7 @@ const Registration = require('../models/Registration');
 const generateTicketNumber = require('../utils/ticketGenerator');
 const { sendRegistrationConfirmation } = require('../services/emailService');
 const { generateRegistrationQR } = require('../services/qrService');
+const { canManageEvent } = require('../utils/eventPermissions');
 
 exports.registerForEvent = async (req, res, next) => {
   try {
@@ -29,16 +30,26 @@ exports.registerForEvent = async (req, res, next) => {
       event: eventId,
     });
 
+    if (existingRegistration && existingRegistration.status !== 'cancelled') {
+      return res.status(409).json({ message: 'You are already registered for this event.' });
+    }
+
+    const activeRegistrations = await Registration.countDocuments({
+      event: eventId,
+      status: { $in: ['confirmed', 'checked-in'] },
+    });
+    if (activeRegistrations >= event.capacity) {
+      return res.status(400).json({ message: 'This event is full.' });
+    }
+
     if (existingRegistration) {
-      if (existingRegistration.status === 'confirmed') {
-        return res.status(409).json({ message: 'You are already registered for this event.' });
-      }
       if (existingRegistration.status === 'cancelled') {
         existingRegistration.status = 'confirmed';
         existingRegistration.ticketNumber = generateTicketNumber();
         existingRegistration.registeredAt = new Date();
         existingRegistration.checkedIn = false;
         existingRegistration.checkedInAt = null;
+        existingRegistration.checkedInBy = null;
         await existingRegistration.save();
 
         const updated = await Registration.findById(existingRegistration._id)
@@ -58,14 +69,6 @@ exports.registerForEvent = async (req, res, next) => {
           email: { status: emailStatus },
         });
       }
-    }
-
-    const activeRegistrations = await Registration.countDocuments({
-      event: eventId,
-      status: 'confirmed',
-    });
-    if (activeRegistrations >= event.capacity) {
-      return res.status(400).json({ message: 'This event is full.' });
     }
 
     const ticketNumber = generateTicketNumber();
@@ -156,11 +159,12 @@ exports.cancelRegistration = async (req, res, next) => {
     if (!registration) return res.status(404).json({ message: 'Registration not found' });
 
     const userId = req.user.userId || req.user._id;
-    if (String(registration.user) !== String(userId) && !['admin', 'organizer'].includes(req.user.role)) {
+    const event = await Event.findById(registration.event).select('organizer date');
+    const isOwner = String(registration.user) === String(userId);
+    if (!isOwner && !canManageEvent(req.user, event)) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
-    const event = await Event.findById(registration.event);
     if (event && new Date(event.date) < new Date(new Date().toDateString())) {
       return res.status(400).json({ message: 'Cannot cancel registration for past event' });
     }
@@ -169,6 +173,7 @@ exports.cancelRegistration = async (req, res, next) => {
       registration.status = 'cancelled';
       registration.checkedIn = false;
       registration.checkedInAt = null;
+      registration.checkedInBy = null;
       await registration.save();
     } else {
       await registration.deleteOne();
@@ -185,7 +190,8 @@ exports.getRegistration = async (req, res, next) => {
     const registration = await Registration.findById(req.params.id).populate('event').populate('user', 'name email');
     if (!registration) return res.status(404).json({ message: 'Registration not found' });
     const userId = req.user.userId || req.user._id;
-    if (String(registration.user._id) !== String(userId) && String(registration.user) !== String(userId) && !['admin', 'organizer'].includes(req.user.role)) {
+    const isOwner = String(registration.user?._id || registration.user) === String(userId);
+    if (!isOwner && !canManageEvent(req.user, registration.event)) {
       return res.status(403).json({ message: 'Not authorized' });
     }
     res.json(registration);
@@ -200,12 +206,13 @@ exports.getTicket = async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid registration ID' });
     }
     const registration = await Registration.findById(req.params.registrationId)
-      .populate('event', 'title description category date time location city image status')
+      .populate('event', 'title description category date time location city image status organizer')
       .populate('user', 'name email');
     if (!registration) return res.status(404).json({ message: 'Registration not found' });
     
     const userId = req.user.userId || req.user._id;
-    if (String(registration.user._id) !== String(userId) && String(registration.user) !== String(userId) && !['admin', 'organizer'].includes(req.user.role)) {
+    const isOwner = String(registration.user?._id || registration.user) === String(userId);
+    if (!isOwner && !canManageEvent(req.user, registration.event)) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -229,6 +236,7 @@ exports.getTicket = async (req, res, next) => {
         location: registration.event.location,
         city: registration.event.city,
         image: registration.event.image,
+        status: registration.event.status,
       } : null,
     };
 

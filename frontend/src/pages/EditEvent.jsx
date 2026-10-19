@@ -258,7 +258,7 @@ export default function EditEvent() {
                 >
                   <option value="draft">Draft</option>
                   <option value="published">Published</option>
-                  <option value="cancelled">Cancelled</option>
+                  <option value="cancelled" disabled>Cancelled</option>
                 </select>
               </div>
             )}

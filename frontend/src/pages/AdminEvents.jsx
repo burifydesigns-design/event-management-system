@@ -12,32 +12,42 @@ export default function AdminEvents() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
-  const [deleteId, setDeleteId] = useState(null)
+  const [deleteEventRecord, setDeleteEventRecord] = useState(null)
   const [actionLoading, setActionLoading] = useState(false)
+  const [filters, setFilters] = useState({ search: '', category: '', city: '', status: 'all', date: 'all' })
+  const [appliedFilters, setAppliedFilters] = useState({})
 
   useEffect(() => {
-    fetchEvents()
-  }, [])
-
-  const fetchEvents = async () => {
-    try {
-      setLoading(true)
-      const data = await getAllEvents()
-      setEvents(data.data || data || [])
-    } catch (err) {
-      setError('Unable to load events.')
-    } finally {
-      setLoading(false)
+    const fetchEvents = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const data = await getAllEvents(appliedFilters)
+        setEvents(data.data || data || [])
+      } catch (err) {
+        setError(err.response?.data?.message || 'Unable to load events.')
+      } finally {
+        setLoading(false)
+      }
     }
-  }
+    fetchEvents()
+  }, [appliedFilters])
 
   const handleDelete = async () => {
+    if (actionLoading || !deleteEventRecord) return
     try {
       setActionLoading(true)
-      await deleteEvent(deleteId)
-      setEvents((prev) => prev.filter((e) => e._id !== deleteId))
-      setSuccess('Event deleted successfully.')
-      setDeleteId(null)
+      setError(null)
+      const result = await deleteEvent(deleteEventRecord._id)
+      if (result.cancelled) {
+        setEvents((prev) => prev.map((event) => (
+          event._id === deleteEventRecord._id ? { ...event, status: 'cancelled' } : event
+        )))
+      } else {
+        setEvents((prev) => prev.filter((event) => event._id !== deleteEventRecord._id))
+      }
+      setSuccess(result.message || (result.cancelled ? 'Event cancelled.' : 'Event deleted.'))
+      setDeleteEventRecord(null)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to delete event.')
     } finally {
@@ -76,6 +86,73 @@ export default function AdminEvents() {
         {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
         {success && <SuccessMessage message={success} onClose={() => setSuccess(null)} />}
 
+        <form
+          className="admin-event-filters"
+          onSubmit={(event) => {
+            event.preventDefault()
+            setAppliedFilters({ ...filters })
+          }}
+        >
+          <label>
+            Search title
+            <input
+              type="search"
+              value={filters.search}
+              onChange={(event) => setFilters({ ...filters, search: event.target.value })}
+              maxLength={100}
+            />
+          </label>
+          <label>
+            Category
+            <input
+              type="search"
+              value={filters.category}
+              onChange={(event) => setFilters({ ...filters, category: event.target.value })}
+              maxLength={100}
+            />
+          </label>
+          <label>
+            City
+            <input
+              type="search"
+              value={filters.city}
+              onChange={(event) => setFilters({ ...filters, city: event.target.value })}
+              maxLength={100}
+            />
+          </label>
+          <label>
+            Status
+            <select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}>
+              <option value="all">All statuses</option>
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </label>
+          <label>
+            Date
+            <select value={filters.date} onChange={(event) => setFilters({ ...filters, date: event.target.value })}>
+              <option value="all">All dates</option>
+              <option value="upcoming">Upcoming</option>
+              <option value="past">Past</option>
+            </select>
+          </label>
+          <div className="admin-event-filter-actions">
+            <button type="submit" className="btn btn-primary">Apply filters</button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => {
+                const reset = { search: '', category: '', city: '', status: 'all', date: 'all' }
+                setFilters(reset)
+                setAppliedFilters({})
+              }}
+            >
+              Reset
+            </button>
+          </div>
+        </form>
+
         {loading ? (
           <Loading text="Loading events..." />
         ) : events.length === 0 ? (
@@ -95,6 +172,7 @@ export default function AdminEvents() {
                   <th>Status</th>
                   <th>Capacity</th>
                   <th>Registrations</th>
+                  <th>Seats left</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -117,9 +195,17 @@ export default function AdminEvents() {
                     <td>{event.capacity}</td>
                     <td>{event.registeredCount || 0}</td>
                     <td>
+                      {event.status === 'published' && new Date(event.date) >= new Date(new Date().setHours(0, 0, 0, 0))
+                        ? Math.max(0, event.capacity - (event.registeredCount || 0))
+                        : '—'}
+                    </td>
+                    <td>
                       <div className="table-actions">
                         <Link to={`/edit-event/${event._id}`} className="btn btn-sm btn-outline">
                           Edit
+                        </Link>
+                        <Link to={`/admin/attendees?eventId=${event._id}`} className="btn btn-sm btn-outline">
+                          Attendees
                         </Link>
                         {event.status === 'draft' && (
                           <button
@@ -130,12 +216,14 @@ export default function AdminEvents() {
                             Publish
                           </button>
                         )}
-                        <button
-                          onClick={() => setDeleteId(event._id)}
-                          className="btn btn-sm btn-danger"
-                        >
-                          Delete
-                        </button>
+                        {event.status !== 'cancelled' && (
+                          <button
+                            onClick={() => setDeleteEventRecord(event)}
+                            className="btn btn-sm btn-danger"
+                          >
+                            {event.hasRegistrations ? 'Cancel' : 'Delete'}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -147,10 +235,14 @@ export default function AdminEvents() {
       </div>
 
       <ConfirmDialog
-        visible={!!deleteId}
-        message="Are you sure you want to delete this event? This action cannot be undone."
+        visible={!!deleteEventRecord}
+        message={deleteEventRecord?.hasRegistrations
+          ? 'This event has registration records. It will be cancelled so issued tickets and attendee history are preserved.'
+          : 'Are you sure you want to permanently delete this event?'}
         onConfirm={handleDelete}
-        onCancel={() => setDeleteId(null)}
+        onCancel={() => setDeleteEventRecord(null)}
+        confirmLabel={deleteEventRecord?.hasRegistrations ? 'Cancel event' : 'Delete event'}
+        confirmDisabled={actionLoading}
       />
     </div>
   )

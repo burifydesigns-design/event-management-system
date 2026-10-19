@@ -6,6 +6,8 @@ const authMiddleware = require('../src/middleware/authMiddleware');
 const { initializeEmailService, setTestTransporter, clearTestTransporter } = require('../src/services/emailService');
 const nodemailer = require('nodemailer');
 
+const authorizationFor = (token) => ({ Authorization: ['Bearer', token].join(' ') });
+
 const app = express();
 app.use(express.json());
 app.use('/api/registrations', registrationRoutes);
@@ -122,6 +124,29 @@ describe('Registration API', () => {
       expect(response.body.email.status).toBe('sent');
     });
 
+    test('does not reactivate a cancelled registration when the event is full', async () => {
+      event.capacity = 1;
+      await event.save();
+      const previousRegistration = await global.testUtils.createRegistration({
+        user: user._id,
+        event: event._id,
+        status: 'cancelled',
+        ticketNumber: 'EVT-OLDTICKET',
+      });
+      const otherAttendee = await global.testUtils.createUser({ email: 'capacity-attendee@example.com' });
+      await global.testUtils.createRegistration({ user: otherAttendee._id, event: event._id });
+
+      await request(app)
+        .post('/api/registrations')
+        .set(authorizationFor(token))
+        .send({ eventId: event._id.toString() })
+        .expect(400);
+
+      const unchanged = await require('../src/models/Registration').findById(previousRegistration._id);
+      expect(unchanged.status).toBe('cancelled');
+      expect(unchanged.ticketNumber).toBe('EVT-OLDTICKET');
+    });
+
     test('returns 404 for non-existent event', async () => {
       const fakeEventId = new mongoose.Types.ObjectId();
       const response = await request(app)
@@ -143,6 +168,21 @@ describe('Registration API', () => {
         .post('/api/registrations')
         .set('Authorization', `Bearer ${token}`)
         .send({ eventId: draftEvent._id.toString() })
+        .expect(400);
+
+      expect(response.body.message).toBe('Event is not published');
+    });
+
+    test('returns 400 for cancelled event', async () => {
+      const cancelledEvent = await global.testUtils.createEvent({
+        organizer: organizer._id,
+        status: 'cancelled',
+      });
+
+      const response = await request(app)
+        .post('/api/registrations')
+        .set(authorizationFor(token))
+        .send({ eventId: cancelledEvent._id.toString() })
         .expect(400);
 
       expect(response.body.message).toBe('Event is not published');
@@ -332,6 +372,23 @@ describe('Registration API', () => {
       expect(response.body.message).toBe('Not authorized');
     });
 
+    test('does not allow an organizer to cancel registrations for another organizer event', async () => {
+      const otherOrganizer = await global.testUtils.createUser({
+        role: 'organizer',
+        email: 'other-registration-organizer@example.com',
+      });
+      const otherEvent = await global.testUtils.createEvent({ organizer: otherOrganizer._id });
+      const registration = await global.testUtils.createRegistration({ user: user._id, event: otherEvent._id });
+
+      const response = await request(app)
+        .delete(`/api/registrations/${registration._id}`)
+        .set(authorizationFor(global.testUtils.getAuthToken(organizer)))
+        .expect(403);
+
+      expect(response.body.message).toBe('Not authorized');
+      expect((await require('../src/models/Registration').findById(registration._id)).status).toBe('confirmed');
+    });
+
     test('allows admin to cancel any registration', async () => {
       const admin = await global.testUtils.createUser({ email: 'admin@example.com', role: 'admin' });
       const adminToken = global.testUtils.getAuthToken(admin);
@@ -393,6 +450,29 @@ describe('Registration API', () => {
       expect(response.body.ticket.event.location).toBe(event.location);
       expect(response.body.ticket.event.city).toBe(event.city);
       expect(response.body.ticket.registeredAt).toBeDefined();
+      // QR code tests
+      expect(response.body.ticket.qrCode).toBeDefined();
+      expect(response.body.ticket.qrCode).toMatch(/^data:image\/png;base64,/);
+    });
+
+    test('returns ticket with QR code containing correct payload format', async () => {
+      const registration = await global.testUtils.createRegistration({ user: user._id, event: event._id });
+
+      const response = await request(app)
+        .get(`/api/registrations/${registration._id}/ticket`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const qrCode = response.body.ticket.qrCode;
+      expect(qrCode).toBeDefined();
+      // Verify it's a valid base64 PNG data URL
+      const base64Data = qrCode.replace(/^data:image\/png;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      // PNG signature: 89 50 4E 47 0D 0A 1A 0A
+      expect(buffer[0]).toBe(0x89);
+      expect(buffer[1]).toBe(0x50);
+      expect(buffer[2]).toBe(0x4E);
+      expect(buffer[3]).toBe(0x47);
     });
 
     test('returns 401 for unauthenticated request', async () => {
@@ -528,7 +608,7 @@ describe('Registration API', () => {
       expect(response.body.ticket.ticketNumber).toBe(registration.ticketNumber);
     });
 
-    test('allows organizer to access any ticket', async () => {
+    test('allows organizer to access tickets for their own event', async () => {
       const organizerToken = global.testUtils.getAuthToken(organizer);
       const otherUser = await global.testUtils.createUser({ email: 'other@example.com' });
       const registration = await global.testUtils.createRegistration({ user: otherUser._id, event: event._id });
@@ -540,6 +620,22 @@ describe('Registration API', () => {
 
       expect(response.body.success).toBe(true);
       expect(response.body.ticket.ticketNumber).toBe(registration.ticketNumber);
+    });
+
+    test('denies organizer access to tickets for events they do not own', async () => {
+      const otherOrganizer = await global.testUtils.createUser({
+        role: 'organizer',
+        email: 'other-ticket-organizer@example.com',
+      });
+      const otherEvent = await global.testUtils.createEvent({ organizer: otherOrganizer._id });
+      const registration = await global.testUtils.createRegistration({ user: user._id, event: otherEvent._id });
+
+      const response = await request(app)
+        .get(`/api/registrations/${registration._id}/ticket`)
+        .set(authorizationFor(global.testUtils.getAuthToken(organizer)))
+        .expect(403);
+
+      expect(response.body.message).toBe('Not authorized');
     });
   });
 });

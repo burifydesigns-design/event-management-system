@@ -5,8 +5,8 @@ export const getDashboard = async () => {
   return data
 }
 
-export const getAllEvents = async () => {
-  const { data } = await api.get('/admin/events')
+export const getAllEvents = async (params = {}) => {
+  const { data } = await api.get('/admin/events', { params })
   return data
 }
 
@@ -28,7 +28,7 @@ export const exportAttendeesCSV = async (eventId) => {
 }
 
 export const scanQR = async (qrToken, eventId) => {
-  const { data } = await api.post('/admin/scan', { qrToken, eventId })
+  const { data } = await api.post('/scan', { qrCode: qrToken, eventId })
   return data
 }
 

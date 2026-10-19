@@ -34,6 +34,11 @@ export default function Ticket({ ticket }) {
           )}
 
           <div className="ticket-details">
+            {event.status === 'cancelled' && (
+              <p className="alert alert-error" role="status">
+                This event was cancelled. This ticket is kept for your records and is not valid for entry.
+              </p>
+            )}
             <div className="ticket-detail">
               <span className="ticket-detail-label">Date</span>
               <span className="ticket-detail-value">{eventDate}</span>
@@ -90,7 +95,7 @@ export default function Ticket({ ticket }) {
             </div>
           </div>
 
-          {ticket.qrCode && (
+          {ticket.qrCode && event.status !== 'cancelled' && (
             <div className="ticket-qr-section">
               <div className="ticket-qr-code">
                 <img 

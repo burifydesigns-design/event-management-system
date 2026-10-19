@@ -19,8 +19,19 @@ export default function Navbar() {
 
   if (user) {
     navLinks.push({ to: '/my-events', label: 'My Events' })
-    navLinks.push({ to: '/create-event', label: 'Create Event' })
+    if (user.role === 'organizer' || user.role === 'admin') {
+      navLinks.push({ to: '/create-event', label: 'Create Event' })
+    }
     navLinks.push({ to: '/profile', label: 'Profile' })
+  }
+  if (user?.role === 'admin') {
+    navLinks.push(
+      { to: '/dashboard', label: 'Overview' },
+      { to: '/admin/events', label: 'Events' },
+      { to: '/admin/attendees', label: 'Attendees' },
+      { to: '/admin/check-in', label: 'Check-In' },
+      { to: '/admin/users', label: 'Users' },
+    )
   }
 
   return (

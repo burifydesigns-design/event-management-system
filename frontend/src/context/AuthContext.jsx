@@ -6,19 +6,28 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState(null)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
-    const savedUser = localStorage.getItem('user')
-    if (token && savedUser) {
-      try {
-        setUser(JSON.parse(savedUser))
-      } catch {
+    if (!token) {
+      setLoading(false)
+      return
+    }
+
+    api.get('/auth/me')
+      .then(({ data }) => {
+        setUser(data.user)
+        localStorage.setItem('user', JSON.stringify(data.user))
+      })
+      .catch((error) => {
         localStorage.removeItem('token')
         localStorage.removeItem('user')
-      }
-    }
-    setLoading(false)
+        if (error.response?.status !== 401) {
+          setAuthError('Unable to verify your session. Please sign in again.')
+        }
+      })
+      .finally(() => setLoading(false))
   }, [])
 
   const login = async (email, password) => {
@@ -27,6 +36,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('token', token)
     localStorage.setItem('user', JSON.stringify(user))
     setUser(user)
+    setAuthError(null)
     return user
   }
 
@@ -36,6 +46,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('token', token)
     localStorage.setItem('user', JSON.stringify(user))
     setUser(user)
+    setAuthError(null)
     return user
   }
 
@@ -43,11 +54,12 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     setUser(null)
+    setAuthError(null)
   }
 
   const updateProfile = async (profileData) => {
     const { data } = await api.put('/auth/profile', profileData)
-    const updatedUser = { ...user, ...data }
+    const updatedUser = { ...user, ...(data.user || data) }
     localStorage.setItem('user', JSON.stringify(updatedUser))
     setUser(updatedUser)
     return updatedUser
@@ -61,6 +73,7 @@ export function AuthProvider({ children }) {
     logout,
     updateProfile,
     loading,
+    authError,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

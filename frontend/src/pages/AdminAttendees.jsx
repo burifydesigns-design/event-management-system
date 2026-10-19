@@ -11,7 +11,8 @@ export default function AdminAttendees() {
   const [events, setEvents] = useState([])
   const [attendees, setAttendees] = useState([])
   const [selectedEventId, setSelectedEventId] = useState(searchParams.get('eventId') || '')
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [eventsLoading, setEventsLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
@@ -22,7 +23,9 @@ export default function AdminAttendees() {
         const data = await getAllEvents()
         setEvents(data.data || data || [])
       } catch (err) {
-        setError('Unable to load events.')
+        setError(err.response?.data?.message || 'Unable to load events.')
+      } finally {
+        setEventsLoading(false)
       }
     }
     fetchEvents()
@@ -33,15 +36,19 @@ export default function AdminAttendees() {
       const fetchAttendees = async () => {
         try {
           setLoading(true)
+          setError(null)
+          setAttendees([])
           const data = await getEventAttendees(selectedEventId)
           setAttendees(data.data || data || [])
         } catch (err) {
-          setError('Unable to load attendees.')
+          setError(err.response?.data?.message || 'Unable to load attendees.')
         } finally {
           setLoading(false)
         }
       }
       fetchAttendees()
+    } else {
+      setAttendees([])
     }
   }, [selectedEventId])
 
@@ -50,6 +57,8 @@ export default function AdminAttendees() {
     setSelectedEventId(eventId)
     if (eventId) {
       setSearchParams({ eventId })
+    } else {
+      setSearchParams({})
     }
   }
 
@@ -91,8 +100,9 @@ export default function AdminAttendees() {
             value={selectedEventId}
             onChange={handleEventChange}
             className="form-select"
+            disabled={eventsLoading}
           >
-            <option value="">Choose an event...</option>
+            <option value="">{eventsLoading ? 'Loading events...' : 'Choose an event...'}</option>
             {events.map((event) => (
               <option key={event._id} value={event._id}>
                 {event.title} - {new Date(event.date).toLocaleDateString()}
@@ -147,7 +157,7 @@ export default function AdminAttendees() {
                     <td>{attendee.attendeeName || attendee.user?.name}</td>
                     <td>{attendee.attendeeEmail || attendee.user?.email}</td>
                     <td>{attendee.ticketNumber}</td>
-                    <td>{new Date(attendee.createdAt).toLocaleDateString()}</td>
+                    <td>{attendee.registeredAt ? new Date(attendee.registeredAt).toLocaleDateString() : '—'}</td>
                     <td>
                       <span className={`badge badge-${attendee.status}`}>
                         {attendee.status}

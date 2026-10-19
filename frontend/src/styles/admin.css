@@ -2,6 +2,86 @@
   padding: 2rem 0 4rem;
 }
 
+.page-dashboard .page-header {
+  margin-bottom: 2rem;
+}
+
+.admin-event-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  align-items: end;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.admin-event-filters label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.admin-event-filters input,
+.admin-event-filters select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0.5rem 0.75rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.admin-event-filters input:focus-visible,
+.admin-event-filters select:focus-visible,
+.admin-event-filters button:focus-visible,
+.page-dashboard a:focus-visible,
+.page-dashboard button:focus-visible,
+.page-admin-events a:focus-visible,
+.page-admin-events button:focus-visible,
+.page-admin-attendees button:focus-visible,
+.navbar-link:focus-visible {
+  outline: 3px solid var(--primary-light);
+  outline-offset: 2px;
+}
+
+.admin-event-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.badge-draft {
+  color: var(--text-secondary);
+  background: var(--border-light);
+}
+
+.badge-published {
+  color: var(--success);
+  background: var(--success-light);
+}
+
+.badge-cancelled {
+  color: var(--danger);
+  background: var(--danger-light);
+}
+
+.badge-confirmed,
+.badge-checked-in {
+  color: var(--success);
+  background: var(--success-light);
+}
+
+.page-admin-attendees select:focus-visible {
+  outline: 3px solid var(--primary-light);
+  outline-offset: 2px;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
