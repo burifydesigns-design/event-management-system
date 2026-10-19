@@ -1,5 +1,6 @@
 const Event = require('../models/Event');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 
 const today = () => {
   const d = new Date();
@@ -12,15 +13,23 @@ exports.listEvents = async (req, res, next) => {
     const { search, category, city, date, price, page = 1, limit = 12 } = req.query;
     const query = { status: 'published' };
 
+    const escapeRegex = (text) => {
+      if (!text) return '';
+      return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+    };
+
     if (search) {
+      const s = escapeRegex(search);
       query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { city: { $regex: search, $options: 'i' } }
+        { title: { $regex: s, $options: 'i' } },
+        { description: { $regex: s, $options: 'i' } },
+        { city: { $regex: s, $options: 'i' } }
       ];
     }
     if (category) query.category = category;
-    if (city) query.city = { $regex: city, $options: 'i' };
+    if (city) {
+      query.city = { $regex: escapeRegex(city), $options: 'i' };
+    }
     if (date === 'upcoming') query.date = { $gte: today() };
     if (date === 'past') query.date = { $lt: today() };
     if (price === 'free') query.price = 0;
@@ -29,8 +38,8 @@ exports.listEvents = async (req, res, next) => {
     const totalEvents = await Event.countDocuments(query);
     const events = await Event.find(query)
       .populate('organizer', 'name email')
-      .skip((page - 1) * limit)
-      .limit(Number(limit))
+      .skip((page - 1) * Number(limit))
+      .limit(Math.min(Number(limit) || 12, 100))
       .sort({ date: 1 });
 
     res.json({ events, page: Number(page), limit: Number(limit), totalEvents, totalPages: Math.ceil(totalEvents / limit) });
@@ -46,6 +55,27 @@ exports.getEvent = async (req, res, next) => {
     }
     const event = await Event.findById(req.params.id).populate('organizer', 'name email');
     if (!event) return res.status(404).json({ message: 'Event not found' });
+    
+    // Check if event is published or if user owns it
+    if (event.status !== 'published') {
+      const user = req.user || (req.headers.authorization ? null : null);
+      // Check authorization
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.split(' ')[1];
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.verify(token, process.env.JWT_SECRET);
+          if (decoded.userId !== String(event.organizer) && decoded.role !== 'admin') {
+            return res.status(404).json({ message: 'Event not found' });
+          }
+        } catch (err) {
+          return res.status(404).json({ message: 'Event not found' });
+        }
+      } else {
+        return res.status(404).json({ message: 'Event not found' });
+      }
+    }
     res.json(event);
   } catch (err) {
     next(err);

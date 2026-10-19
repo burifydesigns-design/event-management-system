@@ -128,3 +128,49 @@ exports.getAnalytics = async (req, res, next) => {
     next(err);
   }
 };
+
+
+exports.getAllEvents = async (req, res, next) => {
+  try {
+    const events = await Event.find().populate('organizer', 'name email').sort({ createdAt: -1 });
+    const withCounts = await Promise.all(events.map(async (e) => {
+      const registeredCount = await Registration.countDocuments({ event: e._id, status: 'confirmed' });
+      return { ...e.toObject(), registeredCount };
+    }));
+    res.json(withCounts);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getAllUsers = async (req, res, next) => {
+  try {
+    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    res.json(users);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.updateUserRole = async (req, res, next) => {
+  try {
+    const { role } = req.body;
+    const validRoles = ['attendee', 'organizer', 'admin'];
+    if (!validRoles.includes(role)) return res.status(400).json({ message: 'Invalid role' });
+    const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true }).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.deleteUser = async (req, res, next) => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json({ message: 'User deleted' });
+  } catch (err) {
+    next(err);
+  }
+};

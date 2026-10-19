@@ -19,11 +19,12 @@ exports.scanTicket = async (req, res, next) => {
 
     ticket.status = 'used';
     ticket.scannedAt = new Date();
-    ticket.scannedBy = req.user._id;
+    ticket.scannedBy = req.user.userId || req.user._id;
     await ticket.save();
 
-    res.json({ valid: true, message: 'Ticket valid — attendee admitted' });
+    res.json({ valid: true, message: 'Ticket valid - attendee admitted' });
   } catch (err) {
+
     next(err);
   }
 };

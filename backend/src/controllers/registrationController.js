@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Event = require('../models/Event');
 const Registration = require('../models/Registration');
 const generateTicketNumber = require('../utils/ticketGenerator');
+const { sendRegistrationConfirmation } = require('../services/emailService');
 
 exports.registerForEvent = async (req, res, next) => {
   try {
@@ -21,8 +22,9 @@ exports.registerForEvent = async (req, res, next) => {
       return res.status(400).json({ message: 'Event is in the past' });
     }
 
+    const userId = req.user.userId || req.user._id;
     const existingRegistration = await Registration.findOne({
-      user: req.user.userId,
+      user: userId,
       event: eventId,
     });
 
@@ -41,9 +43,18 @@ exports.registerForEvent = async (req, res, next) => {
         const updated = await Registration.findById(existingRegistration._id)
           .populate('user', 'name email')
           .populate('event');
+        
+        // Send confirmation email for reactivated registration
+        let emailStatus = 'not_sent';
+        if (updated.user?.email) {
+          const emailResult = await sendRegistrationConfirmation({ registrationId: updated._id });
+          emailStatus = emailResult.status;
+        }
+
         return res.status(201).json({
           message: 'Successfully registered for the event.',
           registration: updated,
+          email: { status: emailStatus },
         });
       }
     }
@@ -58,7 +69,7 @@ exports.registerForEvent = async (req, res, next) => {
 
     const ticketNumber = generateTicketNumber();
     const registration = await Registration.create({
-      user: req.user.userId,
+      user: userId,
       event: eventId,
       ticketNumber,
     });
@@ -67,9 +78,17 @@ exports.registerForEvent = async (req, res, next) => {
       .populate('user', 'name email')
       .populate('event');
 
+    // Send confirmation email
+    let emailStatus = 'not_sent';
+    if (populated.user?.email) {
+      const emailResult = await sendRegistrationConfirmation({ registrationId: populated._id });
+      emailStatus = emailResult.status;
+    }
+
     res.status(201).json({
       message: 'Successfully registered for the event.',
       registration: populated,
+      email: { status: emailStatus },
     });
   } catch (err) {
     next(err);
@@ -78,7 +97,8 @@ exports.registerForEvent = async (req, res, next) => {
 
 exports.getMyRegistrations = async (req, res, next) => {
   try {
-    const registrations = await Registration.find({ user: req.user.userId, status: 'confirmed' })
+    const userId = req.user.userId || req.user._id;
+    const registrations = await Registration.find({ user: userId, status: 'confirmed' })
       .populate('event')
       .sort({ registeredAt: -1 });
     res.json({ count: registrations.length, registrations });
@@ -89,7 +109,8 @@ exports.getMyRegistrations = async (req, res, next) => {
 
 exports.getMyEvents = async (req, res, next) => {
   try {
-    const registrations = await Registration.find({ user: req.user.userId })
+    const userId = req.user.userId || req.user._id;
+    const registrations = await Registration.find({ user: userId })
       .populate('event', 'title description category date time location city image status')
       .sort({ registeredAt: -1 });
 
@@ -129,7 +150,8 @@ exports.cancelRegistration = async (req, res, next) => {
     const registration = await Registration.findById(req.params.id);
     if (!registration) return res.status(404).json({ message: 'Registration not found' });
 
-    if (String(registration.user) !== String(req.user.userId)) {
+    const userId = req.user.userId || req.user._id;
+    if (String(registration.user) !== String(userId) && !['admin', 'organizer'].includes(req.user.role)) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -138,12 +160,30 @@ exports.cancelRegistration = async (req, res, next) => {
       return res.status(400).json({ message: 'Cannot cancel registration for past event' });
     }
 
-    registration.status = 'cancelled';
-    registration.checkedIn = false;
-    registration.checkedInAt = null;
-    await registration.save();
-
+    if (String(registration.user) === String(userId)) {
+      registration.status = 'cancelled';
+      registration.checkedIn = false;
+      registration.checkedInAt = null;
+      await registration.save();
+    } else {
+      await registration.deleteOne();
+    }
     res.json({ message: 'Registration cancelled successfully.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+exports.getRegistration = async (req, res, next) => {
+  try {
+    const registration = await Registration.findById(req.params.id).populate('event').populate('user', 'name email');
+    if (!registration) return res.status(404).json({ message: 'Registration not found' });
+    const userId = req.user.userId || req.user._id;
+    if (String(registration.user._id) !== String(userId) && String(registration.user) !== String(userId) && !['admin', 'organizer'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+    res.json(registration);
   } catch (err) {
     next(err);
   }
