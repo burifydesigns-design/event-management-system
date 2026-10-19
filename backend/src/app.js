@@ -10,8 +10,10 @@ const scanRoutes = require('./routes/scanRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const errorHandler = require('./middleware/errorHandler');
 const connectDB = require('./config/db');
+const { initializeEmailService } = require('./services/emailService');
 
 connectDB();
+initializeEmailService();
 
 const app = express();
 app.use(cors());
