@@ -1,32 +1,32 @@
 import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Loading from '../components/Loading'
 import ErrorMessage from '../components/ErrorMessage'
-import { getRegistration } from '../services/registrationService'
-import { getEvent } from '../services/eventService'
+import { getTicket } from '../services/registrationService'
 import Ticket from '../components/Ticket'
 
 export default function DigitalTicket() {
   const { registrationId } = useParams()
   const { user } = useAuth()
-  const [registration, setRegistration] = useState(null)
-  const [event, setEvent] = useState(null)
+  const navigate = useNavigate()
+  const [ticket, setTicket] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const regData = await getRegistration(registrationId)
-        setRegistration(regData)
-
-        if (regData.event?._id) {
-          const eventData = await getEvent(regData.event._id)
-          setEvent(eventData)
-        }
+        const ticketData = await getTicket(registrationId)
+        setTicket(ticketData.ticket)
       } catch (err) {
-        setError('Unable to load ticket. Please try again.')
+        if (err.response?.status === 403) {
+          setError('You are not authorized to view this ticket.')
+        } else if (err.response?.status === 404) {
+          setError('Ticket not found.')
+        } else {
+          setError('Unable to load ticket. Please try again.')
+        }
       } finally {
         setLoading(false)
       }
@@ -35,15 +35,18 @@ export default function DigitalTicket() {
   }, [registrationId])
 
   if (loading) return <Loading text="Loading ticket..." />
-  if (error) return <ErrorMessage message={error} />
+  if (error) return <ErrorMessage message={error} onClose={() => navigate('/my-events')} />
 
-  if (!registration || !event) {
+  if (!ticket) {
     return (
       <div className="container">
         <div className="empty-state">
           <p className="empty-state-icon">🎫</p>
           <p className="empty-state-title">Ticket not found</p>
           <p className="empty-state-text">The ticket you're looking for doesn't exist.</p>
+          <button onClick={() => navigate('/my-events')} className="btn btn-primary mt-2">
+            Back to My Events
+          </button>
         </div>
       </div>
     )
@@ -57,7 +60,7 @@ export default function DigitalTicket() {
           <p className="page-subtitle">Present this ticket at the venue</p>
         </div>
 
-        <Ticket registration={registration} event={event} />
+        <Ticket ticket={ticket} />
 
         <div className="ticket-actions">
           <button
@@ -65,6 +68,12 @@ export default function DigitalTicket() {
             className="btn btn-primary"
           >
             Print Ticket
+          </button>
+          <button
+            onClick={() => navigate('/my-events')}
+            className="btn btn-outline"
+          >
+            Back to My Events
           </button>
         </div>
       </div>

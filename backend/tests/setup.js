@@ -3,10 +3,19 @@ const mongoose = require('mongoose');
 const { setTestTransporter, clearTestTransporter } = require('../src/services/emailService');
 const nodemailer = require('nodemailer');
 
+process.env.JWT_SECRET = 'test-secret';
+
 let mongoServer;
 
+jest.setTimeout(600000);
+
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
+  global.sentEmails = [];
+  mongoServer = await MongoMemoryServer.create({
+    instance: {
+      launchTimeout: 60000,
+    },
+  });
   const uri = mongoServer.getUri();
   await mongoose.connect(uri);
   
@@ -15,12 +24,17 @@ beforeAll(async () => {
     newline: 'unix',
     buffer: true,
   });
-  testTransport.on('message', (message) => {
-    if (!global.sentEmails) global.sentEmails = [];
-    global.sentEmails.push(message);
-  });
+  
+  // Wrap sendMail to capture emails synchronously
+  const originalSendMail = testTransport.sendMail.bind(testTransport);
+  testTransport.sendMail = async (mailOptions) => {
+    const result = await originalSendMail(mailOptions);
+    global.sentEmails.push(mailOptions);
+    return result;
+  };
+  
   setTestTransporter(testTransport);
-}, 120000);
+}, 600000);
 
 afterAll(async () => {
   await mongoose.disconnect();

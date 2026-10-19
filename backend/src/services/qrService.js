@@ -6,8 +6,22 @@ function generateTicketToken() {
 }
 
 async function generateQRImage(token) {
-  // returns a base64 data URL you can store or send to the frontend
-  return QRCode.toDataURL(token);
+  return QRCode.toDataURL(token, {
+    errorCorrectionLevel: 'M',
+    type: 'image/png',
+    quality: 0.92,
+    margin: 2,
+    color: {
+      dark: '#000000',
+      light: '#ffffff',
+    },
+    width: 300,
+  });
 }
 
-module.exports = { generateTicketToken, generateQRImage };
+async function generateRegistrationQR(ticketNumber) {
+  const payload = `EVT1:${ticketNumber}`;
+  return generateQRImage(payload);
+}
+
+module.exports = { generateTicketToken, generateQRImage, generateRegistrationQR };

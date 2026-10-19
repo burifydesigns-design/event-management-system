@@ -3,6 +3,7 @@ const Event = require('../models/Event');
 const Registration = require('../models/Registration');
 const generateTicketNumber = require('../utils/ticketGenerator');
 const { sendRegistrationConfirmation } = require('../services/emailService');
+const { generateRegistrationQR } = require('../services/qrService');
 
 exports.registerForEvent = async (req, res, next) => {
   try {
@@ -120,8 +121,12 @@ exports.getMyEvents = async (req, res, next) => {
 
     for (const reg of registrations) {
       if (reg.event) {
-        const eventDateTime = new Date(`${reg.event.date}T${reg.event.time || '00:00'}`);
-        if (eventDateTime > now && reg.status === 'confirmed') {
+        const eventDate = new Date(reg.event.date);
+        const eventTime = reg.event.time || '00:00';
+        const [hours, minutes] = eventTime.split(':').map(Number);
+        eventDate.setHours(hours, minutes, 0, 0);
+        
+        if (eventDate > now && reg.status === 'confirmed') {
           upcoming.push(reg);
         } else {
           past.push(reg);
@@ -184,6 +189,50 @@ exports.getRegistration = async (req, res, next) => {
       return res.status(403).json({ message: 'Not authorized' });
     }
     res.json(registration);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getTicket = async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.registrationId)) {
+      return res.status(400).json({ message: 'Invalid registration ID' });
+    }
+    const registration = await Registration.findById(req.params.registrationId)
+      .populate('event', 'title description category date time location city image status')
+      .populate('user', 'name email');
+    if (!registration) return res.status(404).json({ message: 'Registration not found' });
+    
+    const userId = req.user.userId || req.user._id;
+    if (String(registration.user._id) !== String(userId) && String(registration.user) !== String(userId) && !['admin', 'organizer'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    const qrCode = await generateRegistrationQR(registration.ticketNumber);
+
+    const ticket = {
+      ticketNumber: registration.ticketNumber,
+      status: registration.status,
+      registeredAt: registration.registeredAt,
+      qrCode,
+      attendee: {
+        name: registration.user?.name,
+        email: registration.user?.email,
+      },
+      event: registration.event ? {
+        title: registration.event.title,
+        description: registration.event.description,
+        category: registration.event.category,
+        date: registration.event.date,
+        time: registration.event.time,
+        location: registration.event.location,
+        city: registration.event.city,
+        image: registration.event.image,
+      } : null,
+    };
+
+    res.json({ success: true, ticket });
   } catch (err) {
     next(err);
   }

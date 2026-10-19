@@ -1,20 +1,6 @@
-import QRCode from 'qrcode'
-
-export default function Ticket({ registration, event }) {
-  const qrData = JSON.stringify({
-    registrationId: registration._id,
-    ticketNumber: registration.ticketNumber,
-    eventId: event._id,
-  })
-
-  const qrCodeUrl = QRCode.toDataURL(qrData, {
-    width: 200,
-    margin: 2,
-    color: {
-      dark: '#1e293b',
-      light: '#ffffff',
-    },
-  })
+export default function Ticket({ ticket }) {
+  const event = ticket.event
+  const attendee = ticket.attendee
 
   const eventDate = new Date(event.date).toLocaleDateString('en-US', {
     weekday: 'long',
@@ -23,16 +9,29 @@ export default function Ticket({ registration, event }) {
     day: 'numeric',
   })
 
+  const issuedAt = ticket.registeredAt ? new Date(ticket.registeredAt).toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  }) : 'N/A'
+
   return (
     <div className="ticket">
       <div className="ticket-inner">
         <div className="ticket-left">
           <div className="ticket-header">
             <h2 className="ticket-event-name">{event.title}</h2>
-            <span className="ticket-status ticket-status--{registration.status}">
-              {registration.status}
+            <span className="ticket-status ticket-status--{ticket.status}">
+              {ticket.status}
             </span>
           </div>
+
+          {event.image && (
+            <div className="ticket-event-image">
+              <img src={event.image} alt={event.title} loading="lazy" />
+            </div>
+          )}
 
           <div className="ticket-details">
             <div className="ticket-detail">
@@ -53,20 +52,56 @@ export default function Ticket({ registration, event }) {
             </div>
             <div className="ticket-detail">
               <span className="ticket-detail-label">Attendee</span>
-              <span className="ticket-detail-value">{registration.attendeeName}</span>
+              <span className="ticket-detail-value">{attendee.name}</span>
+            </div>
+            <div className="ticket-detail">
+              <span className="ticket-detail-label">Email</span>
+              <span className="ticket-detail-value">{attendee.email}</span>
             </div>
             <div className="ticket-detail">
               <span className="ticket-detail-label">Ticket #</span>
-              <span className="ticket-detail-value ticket-number">{registration.ticketNumber}</span>
+              <span className="ticket-detail-value ticket-number">{ticket.ticketNumber}</span>
+            </div>
+            <div className="ticket-detail">
+              <span className="ticket-detail-label">Issued</span>
+              <span className="ticket-detail-value">{issuedAt}</span>
             </div>
           </div>
         </div>
 
         <div className="ticket-right">
-          <div className="ticket-qr">
-            <img src={qrCodeUrl} alt="QR Code" className="qr-image" />
-            <p className="qr-label">Scan at venue</p>
+          <div className="ticket-summary">
+            <h3>Ticket Details</h3>
+            <div className="ticket-summary-item">
+              <span className="ticket-summary-label">Ticket #</span>
+              <span className="ticket-summary-value ticket-number">{ticket.ticketNumber}</span>
+            </div>
+            <div className="ticket-summary-item">
+              <span className="ticket-summary-label">Status</span>
+              <span className="ticket-summary-value ticket-status ticket-status--{ticket.status}">{ticket.status}</span>
+            </div>
+            <div className="ticket-summary-item">
+              <span className="ticket-summary-label">Event</span>
+              <span className="ticket-summary-value">{event.title}</span>
+            </div>
+            <div className="ticket-summary-item">
+              <span className="ticket-summary-label">Date</span>
+              <span className="ticket-summary-value">{eventDate}</span>
+            </div>
           </div>
+
+          {ticket.qrCode && (
+            <div className="ticket-qr-section">
+              <div className="ticket-qr-code">
+                <img 
+                  src={ticket.qrCode} 
+                  alt="QR code for this event ticket" 
+                  className="qr-code-image"
+                />
+              </div>
+              <p className="ticket-qr-caption">Present this QR code at the venue for check-in</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

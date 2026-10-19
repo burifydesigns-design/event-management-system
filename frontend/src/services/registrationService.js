@@ -20,6 +20,11 @@ export const getRegistration = async (id) => {
   return data
 }
 
+export const getTicket = async (registrationId) => {
+  const { data } = await api.get(`/registrations/${registrationId}/ticket`)
+  return data
+}
+
 export const cancelRegistration = async (id) => {
   const { data } = await api.delete(`/registrations/${id}`)
   return data

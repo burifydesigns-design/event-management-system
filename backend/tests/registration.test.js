@@ -8,30 +8,7 @@ const nodemailer = require('nodemailer');
 
 const app = express();
 app.use(express.json());
-
-let testTransport;
-let sentEmails = [];
-
-beforeAll(() => {
-  testTransport = nodemailer.createTransport({
-    streamTransport: true,
-    newline: 'unix',
-    buffer: true,
-  });
-  testTransport.on('message', (message) => {
-    sentEmails.push(message);
-  });
-  setTestTransporter(testTransport);
-  initializeEmailService();
-});
-
-afterAll(() => {
-  clearTestTransporter();
-});
-
-beforeEach(() => {
-  sentEmails = [];
-});
+app.use('/api/registrations', registrationRoutes);
 
 const createAuthMiddleware = (user) => {
   return (req, res, next) => {
@@ -70,7 +47,7 @@ describe('Registration API', () => {
       expect(response.body.registration.status).toBe('confirmed');
       expect(response.body.email).toBeDefined();
       expect(response.body.email.status).toBe('sent');
-      expect(sentEmails.length).toBe(1);
+      expect(global.sentEmails.length).toBe(1);
     });
 
     test('returns ticket number in response', async () => {
@@ -117,7 +94,7 @@ describe('Registration API', () => {
         .send({ eventId: event._id.toString() })
         .expect(201);
 
-      const initialEmailCount = sentEmails.length;
+      const initialEmailCount = global.sentEmails.length;
 
       await request(app)
         .post('/api/registrations')
@@ -125,7 +102,7 @@ describe('Registration API', () => {
         .send({ eventId: event._id.toString() })
         .expect(409);
 
-      expect(sentEmails.length).toBe(initialEmailCount);
+      expect(global.sentEmails.length).toBe(initialEmailCount);
     });
 
     test('reactivates cancelled registration and sends email', async () => {
@@ -244,6 +221,7 @@ describe('Registration API', () => {
       const failingTransport = nodemailer.createTransport({
         sendMail: () => Promise.reject(new Error('SMTP failed')),
       });
+      const originalTransport = require('../src/services/emailService').testTransporter;
       setTestTransporter(failingTransport);
 
       const response = await request(app)
@@ -255,13 +233,14 @@ describe('Registration API', () => {
       expect(response.body.registration).toBeDefined();
       expect(response.body.email.status).toBe('failed');
       
-      setTestTransporter(testTransport);
+      setTestTransporter(originalTransport);
     });
 
     test('registration persists even when email fails', async () => {
       const failingTransport = nodemailer.createTransport({
         sendMail: () => Promise.reject(new Error('SMTP failed')),
       });
+      const originalTransport = require('../src/services/emailService').testTransporter;
       setTestTransporter(failingTransport);
 
       await request(app)
@@ -275,7 +254,7 @@ describe('Registration API', () => {
       expect(found).toBeDefined();
       expect(found.status).toBe('confirmed');
       
-      setTestTransporter(testTransport);
+      setTestTransporter(originalTransport);
     });
   });
 
@@ -389,6 +368,178 @@ describe('Registration API', () => {
         .expect(404);
 
       expect(response.body.message).toBe('Registration not found');
+    });
+  });
+
+  describe('GET /api/registrations/:registrationId/ticket', () => {
+    test('returns ticket for registration owner', async () => {
+      const registration = await global.testUtils.createRegistration({ user: user._id, event: event._id });
+
+      const response = await request(app)
+        .get(`/api/registrations/${registration._id}/ticket`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.ticket).toBeDefined();
+      expect(response.body.ticket.ticketNumber).toBe(registration.ticketNumber);
+      expect(response.body.ticket.status).toBe('confirmed');
+      expect(response.body.ticket.attendee).toBeDefined();
+      expect(response.body.ticket.attendee.name).toBe(user.name);
+      expect(response.body.ticket.attendee.email).toBe(user.email);
+      expect(response.body.ticket.event).toBeDefined();
+      expect(response.body.ticket.event.title).toBe(event.title);
+      expect(response.body.ticket.event.date).toBeDefined();
+      expect(response.body.ticket.event.location).toBe(event.location);
+      expect(response.body.ticket.event.city).toBe(event.city);
+      expect(response.body.ticket.registeredAt).toBeDefined();
+    });
+
+    test('returns 401 for unauthenticated request', async () => {
+      const registration = await global.testUtils.createRegistration({ user: user._id, event: event._id });
+
+      const response = await request(app)
+        .get(`/api/registrations/${registration._id}/ticket`)
+        .expect(401);
+    });
+
+    test('returns 403 when accessing another user ticket', async () => {
+      const otherUser = await global.testUtils.createUser({ email: 'other@example.com' });
+      const registration = await global.testUtils.createRegistration({ user: otherUser._id, event: event._id });
+
+      const response = await request(app)
+        .get(`/api/registrations/${registration._id}/ticket`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+
+      expect(response.body.message).toBe('Not authorized');
+    });
+
+    test('returns 404 for non-existent registration', async () => {
+      const fakeId = new mongoose.Types.ObjectId();
+      const response = await request(app)
+        .get(`/api/registrations/${fakeId}/ticket`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404);
+
+      expect(response.body.message).toBe('Registration not found');
+    });
+
+    test('handles malformed registration ID safely', async () => {
+      const response = await request(app)
+        .get('/api/registrations/invalid-id/ticket')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(400);
+    });
+
+    test('handles registration without associated event gracefully', async () => {
+      const registration = await global.testUtils.createRegistration({ user: user._id, event: event._id });
+      // Delete the event to simulate missing event
+      await require('../src/models/Event').findByIdAndDelete(event._id);
+
+      const response = await request(app)
+        .get(`/api/registrations/${registration._id}/ticket`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.ticket.event).toBeNull();
+    });
+
+    test('returns cancelled status for cancelled registration', async () => {
+      const registration = await global.testUtils.createRegistration({ 
+        user: user._id, 
+        event: event._id,
+        status: 'cancelled',
+      });
+
+      const response = await request(app)
+        .get(`/api/registrations/${registration._id}/ticket`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.ticket.status).toBe('cancelled');
+    });
+
+    test('ticket response includes correct persisted ticket reference', async () => {
+      const registration = await global.testUtils.createRegistration({ user: user._id, event: event._id });
+
+      const response1 = await request(app)
+        .get(`/api/registrations/${registration._id}/ticket`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const response2 = await request(app)
+        .get(`/api/registrations/${registration._id}/ticket`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response1.body.ticket.ticketNumber).toBe(response2.body.ticket.ticketNumber);
+      expect(response1.body.ticket.ticketNumber).toBe(registration.ticketNumber);
+    });
+
+    test('does not create new registration or ticket on repeated requests', async () => {
+      const registration = await global.testUtils.createRegistration({ user: user._id, event: event._id });
+      const initialCount = await require('../src/models/Registration').countDocuments();
+
+      await request(app)
+        .get(`/api/registrations/${registration._id}/ticket`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      await request(app)
+        .get(`/api/registrations/${registration._id}/ticket`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const finalCount = await require('../src/models/Registration').countDocuments();
+      expect(finalCount).toBe(initialCount);
+    });
+
+    test('does not return private user fields', async () => {
+      const registration = await global.testUtils.createRegistration({ user: user._id, event: event._id });
+
+      const response = await request(app)
+        .get(`/api/registrations/${registration._id}/ticket`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.ticket.attendee).toBeDefined();
+      expect(response.body.ticket.attendee.name).toBe(user.name);
+      expect(response.body.ticket.attendee.email).toBe(user.email);
+      expect(response.body.ticket.attendee.password).toBeUndefined();
+      expect(response.body.ticket.attendee._id).toBeUndefined();
+      expect(response.body.ticket.attendee.role).toBeUndefined();
+    });
+
+    test('allows admin to access any ticket', async () => {
+      const admin = await global.testUtils.createUser({ email: 'admin@example.com', role: 'admin' });
+      const adminToken = global.testUtils.getAuthToken(admin);
+      const otherUser = await global.testUtils.createUser({ email: 'other@example.com' });
+      const registration = await global.testUtils.createRegistration({ user: otherUser._id, event: event._id });
+
+      const response = await request(app)
+        .get(`/api/registrations/${registration._id}/ticket`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.ticket.ticketNumber).toBe(registration.ticketNumber);
+    });
+
+    test('allows organizer to access any ticket', async () => {
+      const organizerToken = global.testUtils.getAuthToken(organizer);
+      const otherUser = await global.testUtils.createUser({ email: 'other@example.com' });
+      const registration = await global.testUtils.createRegistration({ user: otherUser._id, event: event._id });
+
+      const response = await request(app)
+        .get(`/api/registrations/${registration._id}/ticket`)
+        .set('Authorization', `Bearer ${organizerToken}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.ticket.ticketNumber).toBe(registration.ticketNumber);
     });
   });
 });
