@@ -18,12 +18,12 @@ exports.registerForEvent = async (req, res, next) => {
     const currentRegistrations = await Registration.countDocuments({ event: eventId, status: 'confirmed' });
     if (currentRegistrations >= event.capacity) return res.status(409).json({ message: 'Event is full' });
 
-    const existingRegistration = await Registration.findOne({ user: req.user._id, event: eventId });
+    const existingRegistration = await Registration.findOne({ user: req.user.userId, event: eventId });
     if (existingRegistration) return res.status(409).json({ message: 'Already registered for this event' });
 
     const ticketNumber = generateTicketNumber();
     const registration = await Registration.create({
-      user: req.user._id,
+      user: req.user.userId,
       event: eventId,
       ticketNumber,
     });
@@ -57,7 +57,7 @@ exports.registerForEvent = async (req, res, next) => {
 
 exports.getMyEvents = async (req, res, next) => {
   try {
-    const registrations = await Registration.find({ user: req.user._id, status: 'confirmed' })
+    const registrations = await Registration.find({ user: req.user.userId, status: 'confirmed' })
       .populate('event')
       .sort({ registeredAt: -1 });
     res.json(registrations);
@@ -70,14 +70,14 @@ exports.cancelRegistration = async (req, res, next) => {
   try {
     const registration = await Registration.findById(req.params.id);
     if (!registration) return res.status(404).json({ message: 'Registration not found' });
-    if (String(registration.user) !== String(req.user._id) && !['admin', 'organizer'].includes(req.user.role)) {
+    if (String(registration.user) !== String(req.user.userId) && !['admin', 'organizer'].includes(req.user.role)) {
       return res.status(403).json({ message: 'Not authorized' });
     }
     const event = await Event.findById(registration.event);
     if (event && new Date(event.date) < new Date(new Date().toDateString())) {
       return res.status(400).json({ message: 'Cannot cancel registration for past event' });
     }
-    if (String(registration.user) === String(req.user._id)) {
+    if (String(registration.user) === String(req.user.userId)) {
       registration.status = 'cancelled';
       await registration.save();
     } else {
