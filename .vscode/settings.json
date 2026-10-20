@@ -1,0 +1,7 @@
+{
+    "githubPullRequests.ignoredPullRequestBranches": [
+        "main"
+    ],
+    "chat.permissions.default": "autoApprove",
+    "chat.editing.autoAcceptDelay": 99
+}

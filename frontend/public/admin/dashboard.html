@@ -7,8 +7,152 @@
 <link rel="stylesheet" href="../../assets/css/admin.css">
 </head>
 <body>
-<h1>Admin Dashboard</h1>
-<!-- TODO: build this page -->
-<script src="../../assets/js/api.js" defer></script>
+<nav class="navbar">
+  <div class="navbar-container">
+    <div class="navbar-brand">
+      <span class="brand-icon">🎟️</span>EventFlow
+    </div>
+    <div class="navbar-nav">
+      <a href="/admin/dashboard.html" class="navbar-link">Dashboard</a>
+      <a href="/admin/events-manage.html" class="navbar-link">Events</a>
+      <a href="/admin/users-manage.html" class="navbar-link">Users</a>
+      <a href="/admin/attendees-manage.html" class="navbar-link">Attendees</a>
+      <a href="/admin/check-in.html" class="navbar-link">Check-in</a>
+      <a href="/admin/analytics.html" class="navbar-link">Analytics</a>
+      <a href="/admin/settings.html" class="navbar-link">Settings</a>
+    </div>
+    <div class="navbar-actions">
+      <div class="navbar-user">
+        <div class="navbar-user-link">
+          <div class="user-avatar" id="user-avatar">A</div>
+          <span class="user-name" id="user-name">Admin</span>
+        </div>
+        <button class="btn btn-outline btn-sm" id="btn-logout">Logout</button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="container">
+  <div class="page-header">
+    <div>
+      <h1>Admin Dashboard</h1>
+      <p class="page-subtitle">Overview of your event management platform</p>
+    </div>
+    <div class="alert alert-info" style="max-width: 400px;">
+      <span class="alert-icon">ℹ️</span>
+      <span class="alert-message">Platform overview and system-wide statistics</span>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div id="stat-total-users" class="stat-card stat-card--primary">
+      <div class="stat-icon">👥</div>
+      <div class="stat-content">
+        <p class="stat-value">--</p>
+        <p class="stat-label">Total Users</p>
+      </div>
+    </div>
+    <div id="stat-total-events" class="stat-card stat-card--secondary">
+      <div class="stat-icon">📅</div>
+      <div class="stat-content">
+        <p class="stat-value">--</p>
+        <p class="stat-label">Total Events</p>
+      </div>
+    </div>
+    <div id="stat-total-regs" class="stat-card stat-card--accent">
+      <div class="stat-icon">🎫</div>
+      <div class="stat-content">
+        <p class="stat-value">--</p>
+        <p class="stat-label">Total Registrations</p>
+      </div>
+    </div>
+    <div id="stat-upcoming-events" class="stat-card stat-card--success">
+      <div class="stat-icon">📆</div>
+      <div class="stat-content">
+        <p class="stat-value">--</p>
+        <p class="stat-label">Upcoming Events</p>
+      </div>
+    </div>
+    <div id="stat-available-seats" class="stat-card stat-card--warning">
+      <div class="stat-icon">💺</div>
+      <div class="stat-content">
+        <p class="stat-value">--</p>
+        <p class="stat-label">Available Seats</p>
+      </div>
+    </div>
+    <div id="stat-checked-in" class="stat-card stat-card--primary">
+      <div class="stat-icon">✅</div>
+      <div class="stat-content">
+        <p class="stat-value">--</p>
+        <p class="stat-label">Checked-in Attendees</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-grid">
+    <div class="dashboard-section">
+      <h2 class="dashboard-section-title">Quick Actions</h2>
+      <div class="dashboard-actions">
+        <a href="/admin/events-manage.html" class="dashboard-action-card">
+          <span class="dashboard-action-icon">📅</span>
+          <span>Manage Events</span>
+        </a>
+        <a href="/admin/users-manage.html" class="dashboard-action-card">
+          <span class="dashboard-action-icon">👥</span>
+          <span>Manage Users</span>
+        </a>
+        <a href="/admin/attendees-manage.html" class="dashboard-action-card">
+          <span class="dashboard-action-icon">🎫</span>
+          <span>View Attendees</span>
+        </a>
+        <a href="/admin/check-in.html" class="dashboard-action-card">
+          <span class="dashboard-action-icon">📷</span>
+          <span>QR Check-in</span>
+        </a>
+        <a href="/admin/analytics.html" class="dashboard-action-card">
+          <span class="dashboard-action-icon">📊</span>
+          <span>Analytics</span>
+        </a>
+        <a href="/admin/settings.html" class="dashboard-action-card">
+          <span class="dashboard-action-icon">⚙️</span>
+          <span>Settings</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-section mt-4">
+    <h2 class="dashboard-section-title">Recent Events</h2>
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Event</th>
+            <th>Date</th>
+            <th>Location</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="recent-events-list">
+          <tr>
+            <td colspan="5" class="text-center">Loading events...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-bottom">
+      &copy; 2026 EventFlow Admin. All rights reserved.
+    </div>
+  </div>
+</footer>
+
+<script src="../../assets/js/admin/dashboard.js" defer></script>
 </body>
 </html>

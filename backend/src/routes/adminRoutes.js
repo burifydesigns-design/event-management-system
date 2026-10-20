@@ -9,8 +9,8 @@ const {
 } = require('../controllers/adminController');
 
 router.get('/dashboard', auth, role('admin'), getDashboard);
-router.get('/events/:eventId/attendees', auth, role('admin'), getEventAttendees);
-router.get('/events/:eventId/attendees/export', auth, role('admin'), exportEventAttendees);
-router.get('/analytics', auth, role('admin'), getAnalytics);
+router.get('/events/:eventId/attendees', auth, role('admin', 'organizer'), getEventAttendees);
+router.get('/events/:eventId/attendees/export', auth, role('admin', 'organizer'), exportEventAttendees);
+router.get('/analytics', auth, role('admin', 'organizer'), getAnalytics);
 
 module.exports = router;
