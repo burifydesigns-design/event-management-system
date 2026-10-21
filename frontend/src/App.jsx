@@ -13,6 +13,9 @@ import MyEvents from './pages/MyEvents'
 import Profile from './pages/Profile'
 import NotFound from './pages/NotFound'
 import Dashboard from './pages/Dashboard'
+import AttendeeDashboard from './pages/AttendeeDashboard'
+import OrganizerDashboard from './pages/OrganizerDashboard'
+import AdminDashboard from './pages/AdminDashboard'
 import AdminEvents from './pages/AdminEvents'
 import AdminUsers from './pages/AdminUsers'
 import AdminAttendees from './pages/AdminAttendees'
@@ -33,12 +36,23 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/profile" element={<Profile />} />
-            <Route path="/create-event" element={<CreateEvent />} />
-            <Route path="/edit-event/:id" element={<EditEvent />} />
+            <Route element={<ProtectedRoute allowedRoles={['organizer', 'admin']} />}>
+              <Route path="/create-event" element={<CreateEvent />} />
+              <Route path="/edit-event/:id" element={<EditEvent />} />
+            </Route>
             <Route path="/my-events" element={<MyEvents />} />
             <Route path="/my-ticket/:registrationId" element={<DigitalTicket />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route element={<ProtectedRoute allowedRoles={['attendee']} />}>
+              <Route path="/dashboard/attendee" element={<AttendeeDashboard />} />
+            </Route>
+            <Route element={<ProtectedRoute allowedRoles={['organizer', 'admin']} />}>
+              <Route path="/dashboard/organizer" element={<OrganizerDashboard />} />
+            </Route>
             <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/dashboard/admin" element={<AdminDashboard />} />
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/dashboard/analytics" element={<AdminAnalytics />} />
               <Route path="/admin/events" element={<AdminEvents />} />
               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/admin/attendees" element={<AdminAttendees />} />
@@ -55,3 +69,5 @@ function App() {
 }
 
 export default App
+
+

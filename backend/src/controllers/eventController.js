@@ -79,7 +79,7 @@ exports.updateEvent = async (req, res, next) => {
     if (String(event.organizer) !== String(req.user.userId) && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not your event' });
     }
-    const updated = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const updateData = { ...req.body }; delete updateData.organizer; delete updateData._id; const updated = await Event.findByIdAndUpdate(req.params.id, updateData, { new: true });
     res.json(updated);
   } catch (err) {
     next(err);

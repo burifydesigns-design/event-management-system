@@ -214,3 +214,93 @@ exports.getAnalytics = async (req, res, next) => {
     next(err);
   }
 };
+
+// Additional analytics endpoint
+exports.getAnalyticsDashboard = exports.getAnalytics;
+
+
+// Add organizer-scoped analytics
+exports.getOrganizerAnalytics = async (req, res, next) => {
+  try {
+    const mongoose = require('mongoose');
+    const userId = req.user && (req.user.userId || req.user._id);
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user' });
+    }
+    const organizerObjectId = new mongoose.Types.ObjectId(String(userId));
+
+    const events = await Event.find({ organizer: organizerObjectId }, '_id title capacity date');
+    const eventIds = events.map(e => e._id);
+
+    if (eventIds.length === 0) {
+      return res.json({
+        registrationsOverTime: [],
+        registrationsPerEvent: [],
+        checkInRate: 0,
+        capacityUtilization: [],
+      });
+    }
+
+    const registrationsOverTime = await Registration.aggregate([
+      { $match: { event: { $in: eventIds } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$registeredAt' } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const registrationsPerEvent = await Registration.aggregate([
+      { $match: { event: { $in: eventIds }, status: 'confirmed' } },
+      {
+        $group: {
+          _id: '$event',
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const totalConfirmed = await Registration.countDocuments({ event: { $in: eventIds }, status: 'confirmed' });
+    const totalCheckedIn = await Registration.countDocuments({ event: { $in: eventIds }, checkedIn: true });
+    const checkInRate = totalConfirmed > 0 ? (totalCheckedIn / totalConfirmed) * 100 : 0;
+
+    const capacityUtilization = await Event.aggregate([
+      { $match: { _id: { $in: eventIds } } },
+      {
+        $lookup: {
+          from: 'registrations',
+          localField: '_id',
+          foreignField: 'event',
+          as: 'registrations',
+        },
+      },
+      {
+        $project: {
+          title: 1,
+          capacity: 1,
+          registered: { $size: '$registrations' },
+          utilization: {
+            $cond: [
+              { $eq: ['$capacity', 0] },
+              0,
+              { $multiply: [{ $divide: [{ $size: '$registrations' }, '$capacity'] }, 100] },
+            ],
+          },
+        },
+      },
+    ]);
+
+    res.json({
+      registrationsOverTime,
+      registrationsPerEvent,
+      checkInRate,
+      capacityUtilization,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getAnalyticsDashboard = exports.getAnalytics;

@@ -1,81 +1,63 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+﻿import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { Link } from 'react-router-dom'
 
 export default function Navbar() {
-  const [isOpen, setIsOpen] = useState(false)
   const { user, logout } = useAuth()
-  const navigate = useNavigate()
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
-  const handleLogout = () => {
-    logout()
-    navigate('/events')
-  }
-
-  const navLinks = [
-    { to: '/', label: 'Home' },
-    { to: '/events', label: 'Events' },
-  ]
-
-  if (user) {
-    navLinks.push({ to: '/my-events', label: 'My Events' })
-    navLinks.push({ to: '/profile', label: 'Profile' })
+  const getDashboardLink = () => {
+    if (!user) return '/'
+    if (user.role === 'admin') return '/dashboard/admin'
+    if (user.role === 'organizer') return '/dashboard/organizer'
+    return '/dashboard/attendee'
   }
 
   return (
     <nav className="navbar">
       <div className="container navbar-container">
-        <Link to="/" className="navbar-brand">
-          <span className="brand-icon">🎉</span>
-          <span className="brand-text">EventEase</span>
+        <Link to="/" className="navbar-logo">
+          EventHub
         </Link>
 
-        <button
-          className="navbar-toggle"
-          onClick={() => setIsOpen(!isOpen)}
-          aria-label="Toggle navigation"
-        >
-          <span></span>
-          <span></span>
-          <span></span>
+        <button className="navbar-toggle" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+          ☰
         </button>
 
-        <div className={`navbar-menu ${isOpen ? 'navbar-menu--open' : ''}`}>
-          <div className="navbar-nav">
-            {navLinks.map((link) => (
-              <Link
-                key={link.to}
-                to={link.to}
-                className="navbar-link"
-                onClick={() => setIsOpen(false)}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-
-          <div className="navbar-actions">
-            {user ? (
+        <div className={
+avbar-menu }>
+          <Link to="/" className="navbar-link">Home</Link>
+          <Link to="/events" className="navbar-link">Events</Link>
+          
+          {user ? (
+            <>
+              <Link to={getDashboardLink()} className="navbar-link">Dashboard</Link>
+              {user.role === 'attendee' && (
+                <>
+                  <Link to="/my-events" className="navbar-link">My Events</Link>
+                  <Link to="/profile" className="navbar-link">Profile</Link>
+                </>
+              )}
+              {(user.role === 'organizer' || user.role === 'admin') && (
+                <Link to="/create-event" className="navbar-link">Create Event</Link>
+              )}
+              {user.role === 'admin' && (
+                <>
+                  <Link to="/admin/users" className="navbar-link">Users</Link>
+                  <Link to="/admin/analytics" className="navbar-link">Analytics</Link>
+                </>
+              )}
               <div className="navbar-user">
-                <Link to="/profile" className="navbar-user-link" onClick={() => setIsOpen(false)}>
-                  <span className="user-avatar">{user.name?.charAt(0).toUpperCase()}</span>
-                  <span className="user-name">{user.name}</span>
-                </Link>
-                <button onClick={handleLogout} className="btn btn-outline btn-sm">
-                  Logout
-                </button>
+                <span className="navbar-user-name">{user.name} ({user.role})</span>
+                <button onClick={logout} className="navbar-logout">Logout</button>
               </div>
-            ) : (
-              <div className="navbar-auth">
-                <Link to="/login" className="btn btn-outline btn-sm" onClick={() => setIsOpen(false)}>
-                  Login
-                </Link>
-                <Link to="/register" className="btn btn-primary btn-sm" onClick={() => setIsOpen(false)}>
-                  Register
-                </Link>
-              </div>
-            )}
-          </div>
+            </>
+          ) : (
+            <>
+              <Link to="/login" className="navbar-link">Login</Link>
+              <Link to="/register" className="navbar-link navbar-link--primary">Register</Link>
+            </>
+          )}
         </div>
       </div>
     </nav>
