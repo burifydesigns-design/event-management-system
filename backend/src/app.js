@@ -13,10 +13,22 @@ const ticketRoutes = require('./routes/ticketRoutes');
 const scanRoutes = require('./routes/scanRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
 const errorHandler = require('./middleware/errorHandler');
 const connectDB = require('./config/db');
+const mongoose = require('mongoose');
+
+function validateEnv() {
+  const required = ['MONGO_URI', 'JWT_SECRET'];
+  const missing = required.filter((key) => !process.env[key]);
+  if (missing.length > 0) {
+    console.error(`Missing required environment variables: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+}
 
 connectDB();
+validateEnv();
 
 const app = express();
 app.set('trust proxy', 1);
@@ -78,6 +90,19 @@ app.use('/api/tickets', ticketRoutes);
 app.use('/api/scan', scanRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/analytics', analyticsRoutes);
+
+app.get('/api/health', async (_req, res) => {
+  let dbStatus = 'unknown';
+  try {
+    const state = mongoose.connection.readyState;
+    // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+    dbStatus = state === 1 ? 'connected' : 'disconnected';
+  } catch (_err) {
+    dbStatus = 'error';
+  }
+  res.json({ status: 'ok', service: 'event-management-api', database: dbStatus });
+});
 
 app.get('/', (req, res) => res.send('Event Management API running'));
 

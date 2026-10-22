@@ -18,6 +18,9 @@ exports.registerForEvent = async (req, res, next) => {
     if (event.status !== 'published') return res.status(400).json({ message: 'Event is not published' });
     const today = new Date(); today.setHours(0,0,0,0);
     if (new Date(event.date) < today) return res.status(400).json({ message: 'Event is in the past' });
+    if (event.registrationDeadline && new Date() > new Date(event.registrationDeadline)) {
+      return res.status(400).json({ message: 'Registration deadline has passed' });
+    }
     const existingRegistration = await Registration.findOne({ user: req.user.userId, event: eventId });
     if (existingRegistration) return res.status(409).json({ message: 'Already registered for this event' });
     const currentRegistrations = await Registration.countDocuments({ event: eventId, status: 'confirmed' });
@@ -77,5 +80,24 @@ exports.cancelRegistration = async (req, res, next) => {
     if (String(registration.user) === String(req.user.userId)) { registration.status = 'cancelled'; await registration.save(); }
     else { await registration.deleteOne(); }
     res.json({ message: 'Registration cancelled' });
+  } catch (err) { next(err); }
+};
+
+exports.getRegistration = async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ message: 'Invalid ID' });
+    const registration = await Registration.findById(req.params.id)
+      .populate('event', 'title date time location city status capacity organizer')
+      .populate('user', 'name email role');
+    if (!registration) return res.status(404).json({ message: 'Registration not found' });
+    const event = registration.event;
+    const isOwner = String(registration.user._id) === String(req.user.userId);
+    const isStaff = req.user.role === 'admin' || String(event.organizer) === String(req.user.userId);
+    if (!isOwner && !isStaff) return res.status(403).json({ message: 'Not authorized' });
+    res.json({
+      ...registration.toObject(),
+      event: { id: event._id, title: event.title, date: event.date, time: event.time, location: event.location, city: event.city, status: event.status },
+      user: { id: registration.user._id, name: registration.user.name, email: registration.user.email, role: registration.user.role },
+    });
   } catch (err) { next(err); }
 };

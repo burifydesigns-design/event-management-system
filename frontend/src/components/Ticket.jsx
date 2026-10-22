@@ -53,7 +53,7 @@ export default function Ticket({ registration, event }) {
             </div>
             <div className="ticket-detail">
               <span className="ticket-detail-label">Attendee</span>
-              <span className="ticket-detail-value">{registration.attendeeName}</span>
+              <span className="ticket-detail-value">{registration.user?.name || registration.attendeeName}</span>
             </div>
             <div className="ticket-detail">
               <span className="ticket-detail-label">Ticket #</span>

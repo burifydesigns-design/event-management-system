@@ -6,10 +6,12 @@ const {
   registerForEvent,
   getMyEvents,
   cancelRegistration,
+  getRegistration,
 } = require('../controllers/registrationController');
 
 router.post('/', auth, role('attendee', 'organizer', 'admin'), validateRegistration, registerForEvent);
 router.get('/my-events', auth, getMyEvents);
+router.get('/:id', auth, validateObjectIdParam('id'), getRegistration);
 router.delete('/:id', auth, validateObjectIdParam('id'), cancelRegistration);
 
 module.exports = router;

@@ -15,11 +15,16 @@ const eventSchema = new mongoose.Schema(
     organizer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     status: {
       type: String,
-      enum: ['draft', 'published'],
+      enum: ['draft', 'published', 'cancelled'],
       default: 'draft',
     },
+    registrationDeadline: { type: Date },
   },
   { timestamps: true }
 );
+
+eventSchema.index({ status: 1, date: 1 });
+eventSchema.index({ category: 1, date: 1 });
+eventSchema.index({ organizer: 1, status: 1 });
 
 module.exports = mongoose.model('Event', eventSchema);

@@ -27,8 +27,8 @@ export const exportAttendeesCSV = async (eventId) => {
   return data
 }
 
-export const scanQR = async (qrToken, eventId) => {
-  const { data } = await api.post('/admin/scan', { qrToken, eventId })
+export const checkInTicket = async (ticketNumber, eventId) => {
+  const { data } = await api.post('/tickets/check-in', { ticketNumber, eventId })
   return data
 }
 
@@ -38,7 +38,7 @@ export const getAnalytics = async () => {
 }
 
 export const updateUserRole = async (userId, role) => {
-  const { data } = await api.put(`/admin/users/${userId}`, { role })
+  const { data } = await api.patch(`/admin/users/${userId}/role`, { role })
   return data
 }
 
