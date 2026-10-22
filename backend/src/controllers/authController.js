@@ -81,3 +81,8 @@ exports.updateProfile = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.logout = async (_req, res) => {
+  res.clearCookie('token');
+  res.json({ message: 'Logged out successfully' });
+};

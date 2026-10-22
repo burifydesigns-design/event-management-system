@@ -81,7 +81,7 @@ export default function AttendeeDashboard() {
                       <p>📅 {new Date(reg.event?.date || reg.date).toLocaleDateString()} • 📍 {reg.event?.city || reg.event?.location}</p>
                     </div>
                     <div className="event-item-actions">
-                      <Link to={/my-ticket/} className="btn btn-primary btn-sm">View Ticket</Link>
+                      <Link to={`/my-ticket/${reg._id}`} className="btn btn-primary btn-sm">View Ticket</Link>
                     </div>
                   </div>
                 ))}

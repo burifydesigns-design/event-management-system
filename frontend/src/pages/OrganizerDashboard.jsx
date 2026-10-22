@@ -68,7 +68,7 @@ export default function OrganizerDashboard() {
                       <p>📅 {new Date(event.date).toLocaleDateString()} • 📊 {event.status}</p>
                     </div>
                     <div className="event-item-actions">
-                      <Link to={/edit-event/} className="btn btn-outline btn-sm">Edit</Link>
+                      <Link to={`/edit-event/${event._id}`} className="btn btn-outline btn-sm">Edit</Link>
                       <Link to="/admin/attendees" className="btn btn-outline btn-sm">Attendees</Link>
                     </div>
                   </div>

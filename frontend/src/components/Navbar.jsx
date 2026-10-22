@@ -24,8 +24,7 @@ export default function Navbar() {
           ☰
         </button>
 
-        <div className={
-avbar-menu }>
+        <div className="navbar-menu">
           <Link to="/" className="navbar-link">Home</Link>
           <Link to="/events" className="navbar-link">Events</Link>
           
