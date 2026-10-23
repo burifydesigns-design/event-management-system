@@ -3,7 +3,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3rem 1rem;
+  padding: 1.5rem 1rem;
 }
 
 .auth-container {
@@ -13,7 +13,7 @@
 
 .auth-card {
   background: var(--surface);
-  padding: 2.5rem;
+  padding: 1.5rem;
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
 }
@@ -24,7 +24,7 @@
 }
 
 .auth-title {
-  font-size: 1.875rem;
+  font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: 0.5rem;
 }
@@ -54,8 +54,22 @@
   text-decoration: underline;
 }
 
-@media (max-width: 480px) {
+@media (min-width: 481px) {
   .auth-card {
-    padding: 1.5rem;
+    padding: 2rem;
+  }
+
+  .auth-title {
+    font-size: 1.875rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .page-auth {
+    padding: 3rem 1rem;
+  }
+
+  .auth-card {
+    padding: 2.5rem;
   }
 }
