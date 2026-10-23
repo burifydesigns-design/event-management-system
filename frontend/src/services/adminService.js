@@ -32,8 +32,8 @@ export const checkInTicket = async (ticketNumber, eventId) => {
   return data
 }
 
-export const getAnalytics = async () => {
-  const { data } = await api.get('/admin/analytics')
+export const getAnalytics = async (params = {}) => {
+  const { data } = await api.get('/admin/analytics', { params })
   return data
 }
 

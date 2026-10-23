@@ -106,7 +106,7 @@ export default function AdminAttendees() {
             <h3>Attendees</h3>
             <button
               onClick={handleExport}
-              disabled={exporting || attendees.length === 0}
+              disabled={exporting}
               className="btn btn-outline"
             >
               {exporting ? 'Exporting...' : 'Export CSV'}

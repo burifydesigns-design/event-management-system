@@ -1,8 +1,7 @@
 const User = require('../models/User');
 const Event = require('../models/Event');
 const Registration = require('../models/Registration');
-const mongoose = require('mongoose');
-const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
+const { generateAttendeesCSV } = require('../utils/csvExport');
 
 exports.getDashboard = async (req, res, next) => {
   try {
@@ -36,30 +35,162 @@ exports.getDashboard = async (req, res, next) => {
   }
 };
 
-// Admin event management list: all statuses (draft + published), paginated.
-// `registeredCount` is resolved with a single $lookup aggregation, avoiding N+1.
-exports.getAllEvents = async (req, res, next) => {
+exports.getEventAttendees = async (req, res, next) => {
   try {
-    const { page, limit, skip, error } = parsePagination(req.query, { defaultLimit: 10 });
-    if (error) return res.status(400).json({ message: error });
+    const { eventId } = req.params;
 
-    const { status, search } = req.query;
-    const match = {};
-    if (status) {
-      if (!['draft', 'published'].includes(status)) {
-        return res.status(400).json({ message: 'Invalid status filter' });
+    if (req.user.role === 'organizer') {
+      const event = await Event.findById(eventId).select('_id organizer');
+      if (!event) {
+        return res.status(404).json({ message: 'Event not found' });
       }
-      match.status = status;
-    }
-    if (search) {
-      match.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { city: { $regex: search, $options: 'i' } },
-      ];
+      if (String(event.organizer) !== String(req.user.userId)) {
+        return res.status(403).json({ message: 'Not authorized to view this event' });
+      }
     }
 
-    const [result] = await Event.aggregate([
-      { $match: match },
+    const attendees = await Registration.find({ event: eventId })
+      .populate('user', 'name email')
+      .sort({ registeredAt: -1 });
+    res.json(attendees);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.exportEventAttendees = async (req, res, next) => {
+  try {
+    const { eventId } = req.params;
+
+    if (!eventId || !require('mongoose').Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ message: 'Invalid event ID' });
+    }
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    // Role-based scope: organizers may only export events they organize.
+    if (req.user.role === 'organizer' && String(event.organizer) !== String(req.user.userId)) {
+      return res.status(403).json({ message: 'Not authorized to export this event' });
+    }
+
+    const registrations = await Registration.find({ event: eventId })
+      .populate('user', 'name email')
+      .populate('event', 'title')
+      .sort({ registeredAt: -1 });
+
+    const csv = generateAttendeesCSV(registrations);
+
+    const safeEventId = String(eventId).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    const filename = `attendees-${safeEventId}-${dateStamp}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.send(csv);
+  } catch (err) {
+    next(err);
+  }
+};
+
+function dateRangeMatch(startDate, endDate) {
+  const match = {};
+  if (startDate) {
+    const start = new Date(startDate);
+    if (!isNaN(start.getTime())) match.$gte = start;
+  }
+  if (endDate) {
+    const end = new Date(endDate);
+    if (!isNaN(end.getTime())) {
+      end.setHours(23, 59, 59, 999);
+      match.$lte = end;
+    }
+  }
+  return Object.keys(match).length > 0 ? match : null;
+}
+
+exports.getAnalytics = async (req, res, next) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const rangeMatch = dateRangeMatch(startDate, endDate);
+
+    const registrationMatch = {};
+    if (rangeMatch) registrationMatch.registeredAt = rangeMatch;
+
+    // Organizers see only their own events; admins see platform-wide data.
+    let organizerEventIds = null;
+    if (req.user.role === 'organizer') {
+      organizerEventIds = await Event.find({ organizer: req.user.userId }).distinct('_id');
+      if (organizerEventIds.length === 0) {
+        return res.json({
+          registrationsOverTime: [],
+          registrationsPerEvent: [],
+          checkInRate: 0,
+          totalCheckedIn: 0,
+          totalConfirmed: 0,
+          capacityUtilization: [],
+        });
+      }
+      registrationMatch.event = { $in: organizerEventIds };
+    }
+
+    // Registrations over time: grouped by registration timestamp (not event date).
+    const registrationsOverTime = await Registration.aggregate([
+      { $match: registrationMatch },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$registeredAt' } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // Registrations per event: confirmed registrations only, with event name.
+    const registrationsPerEvent = await Registration.aggregate([
+      { $match: { ...registrationMatch, status: 'confirmed' } },
+      {
+        $group: {
+          _id: '$event',
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $lookup: {
+          from: 'events',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'event',
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          eventId: '$_id',
+          eventName: { $arrayElemAt: ['$event.title', 0] },
+          count: 1,
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+
+    const totalConfirmed = await Registration.countDocuments({
+      ...registrationMatch,
+      status: 'confirmed',
+    });
+    const totalCheckedIn = await Registration.countDocuments({
+      ...registrationMatch,
+      status: 'confirmed',
+      checkedIn: true,
+    });
+    const checkInRate = totalConfirmed > 0 ? (totalCheckedIn / totalConfirmed) * 100 : 0;
+
+    // Capacity utilization: confirmed registrations only (cancelled excluded).
+    const capacityUtilization = await Event.aggregate([
+      organizerEventIds ? { $match: { _id: { $in: organizerEventIds } } } : { $match: {} },
       {
         $lookup: {
           from: 'registrations',
@@ -69,368 +200,48 @@ exports.getAllEvents = async (req, res, next) => {
               $match: {
                 $expr: { $eq: ['$event', '$$eventId'] },
                 status: 'confirmed',
+                ...(rangeMatch ? { registeredAt: rangeMatch } : {}),
               },
             },
             { $count: 'count' },
           ],
-          as: 'registrationCounts',
-        },
-      },
-      {
-        $addFields: {
-          registeredCount: {
-            $ifNull: [{ $arrayElemAt: ['$registrationCounts.count', 0] }, 0],
-          },
-        },
-      },
-      { $project: { registrationCounts: 0 } },
-      // Deterministic sort with unique tie-breaker for stable pagination.
-      { $sort: { date: 1, _id: 1 } },
-      {
-        $facet: {
-          metadata: [{ $count: 'totalItems' }],
-          data: [{ $skip: skip }, { $limit: limit }],
-        },
-      },
-    ]);
-
-    const totalItems = (result && result.metadata && result.metadata[0] && result.metadata[0].totalItems) || 0;
-    const data = (result && result.data) || [];
-
-    res.json({ data, pagination: buildPaginationMeta({ page, limit, totalItems }) });
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.getEventAttendees = async (req, res, next) => {
-  try {
-    const { eventId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(eventId)) {
-      return res.status(400).json({ message: 'Invalid event ID' });
-    }
-
-    const { page, limit, skip, error } = parsePagination(req.query, { defaultLimit: 10 });
-    if (error) return res.status(400).json({ message: error });
-
-    const query = { event: eventId };
-    const totalItems = await Registration.countDocuments(query);
-    const attendees = await Registration.find(query)
-      .populate('user', 'name email')
-      .sort({ registeredAt: -1, _id: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    res.json({ data: attendees, pagination: buildPaginationMeta({ page, limit, totalItems }) });
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.exportEventAttendees = async (req, res, next) => {
-  try {
-    // Step 23 contract: the export always includes ALL registrations matching
-    // the authorized scope (the event), not just a paginated page.
-    const registrations = await Registration.find({ event: req.params.eventId })
-      .populate('user', 'name email')
-      .populate('event', 'title')
-      .sort({ registeredAt: -1, _id: -1 });
-
-    let csv = 'Name,Email,Event,Ticket Number,Registration Date,Registration Status,Check-in Status\n';
-    registrations.forEach((r) => {
-      const name = r.user ? r.user.name.replace(/"/g, '""') : '';
-      const email = r.user ? r.user.email : '';
-      const eventTitle = r.event && r.event.title ? r.event.title.replace(/"/g, '""') : '';
-      const checkInStatus = r.checkedIn ? 'Checked In' : 'Not Checked In';
-      csv += `"${name}","${email}","${eventTitle}","${r.ticketNumber}","${r.registeredAt}","${r.status}","${checkInStatus}"\n`;
-    });
-
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=attendees.csv`);
-    res.send(csv);
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.getAnalytics = async (req, res, next) => {
-  try {
-    const registrationsOverTime = await Registration.aggregate([
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$registeredAt' } },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
-    const registrationsPerEvent = await Registration.aggregate([
-      { $match: { status: 'confirmed' } },
-      {
-        $group: {
-          _id: '$event',
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-
-    const totalConfirmed = await Registration.countDocuments({ status: 'confirmed' });
-    const totalCheckedIn = await Registration.countDocuments({ checkedIn: true });
-    const checkInRate = totalConfirmed > 0 ? (totalCheckedIn / totalConfirmed) * 100 : 0;
-
-    const capacityUtilization = await Event.aggregate([
-      {
-        $lookup: {
-          from: 'registrations',
-          localField: '_id',
-          foreignField: 'event',
-          as: 'registrations',
+          as: 'regCount',
         },
       },
       {
         $project: {
-          title: 1,
+          _id: 0,
+          eventId: '$_id',
+          eventName: '$title',
           capacity: 1,
-          registered: { $size: '$registrations' },
+          registered: {
+            $ifNull: [{ $arrayElemAt: ['$regCount.count', 0] }, 0],
+          },
           utilization: {
             $cond: [
               { $eq: ['$capacity', 0] },
               0,
-              { $multiply: [{ $divide: [{ $size: '$registrations' }, '$capacity'] }, 100] },
+              {
+                $multiply: [
+                  { $divide: [{ $ifNull: [{ $arrayElemAt: ['$regCount.count', 0] }, 0] }, '$capacity'] },
+                  100,
+                ],
+              },
             ],
           },
         },
       },
+      { $sort: { utilization: -1 } },
     ]);
 
     res.json({
       registrationsOverTime,
       registrationsPerEvent,
       checkInRate,
+      totalCheckedIn,
+      totalConfirmed,
       capacityUtilization,
     });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// Additional analytics endpoint
-exports.getAnalyticsDashboard = exports.getAnalytics;
-
-
-// Add organizer-scoped analytics
-exports.getOrganizerAnalytics = async (req, res, next) => {
-  try {
-    const mongoose = require('mongoose');
-    const userId = req.user && (req.user.userId || req.user._id);
-    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: 'Invalid user' });
-    }
-    const organizerObjectId = new mongoose.Types.ObjectId(String(userId));
-
-    const events = await Event.find({ organizer: organizerObjectId }, '_id title capacity date');
-    const eventIds = events.map(e => e._id);
-
-    if (eventIds.length === 0) {
-      return res.json({
-        registrationsOverTime: [],
-        registrationsPerEvent: [],
-        checkInRate: 0,
-        capacityUtilization: [],
-      });
-    }
-
-    const registrationsOverTime = await Registration.aggregate([
-      { $match: { event: { $in: eventIds } } },
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$registeredAt' } },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
-    const registrationsPerEvent = await Registration.aggregate([
-      { $match: { event: { $in: eventIds }, status: 'confirmed' } },
-      {
-        $group: {
-          _id: '$event',
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-
-    const totalConfirmed = await Registration.countDocuments({ event: { $in: eventIds }, status: 'confirmed' });
-    const totalCheckedIn = await Registration.countDocuments({ event: { $in: eventIds }, checkedIn: true });
-    const checkInRate = totalConfirmed > 0 ? (totalCheckedIn / totalConfirmed) * 100 : 0;
-
-    const capacityUtilization = await Event.aggregate([
-      { $match: { _id: { $in: eventIds } } },
-      {
-        $lookup: {
-          from: 'registrations',
-          localField: '_id',
-          foreignField: 'event',
-          as: 'registrations',
-        },
-      },
-      {
-        $project: {
-          title: 1,
-          capacity: 1,
-          registered: { $size: '$registrations' },
-          utilization: {
-            $cond: [
-              { $eq: ['$capacity', 0] },
-              0,
-              { $multiply: [{ $divide: [{ $size: '$registrations' }, '$capacity'] }, 100] },
-            ],
-          },
-        },
-      },
-    ]);
-
-    res.json({
-      registrationsOverTime,
-      registrationsPerEvent,
-      checkInRate,
-      capacityUtilization,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// GET /api/admin/users/:id
-exports.getUser = async (req, res, next) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: 'Invalid user ID' });
-    }
-    const user = await User.findById(req.params.id).select('-password');
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json({ user });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// PATCH /api/admin/users/:id/role
-exports.updateUserRole = async (req, res, next) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: 'Invalid user ID' });
-    }
-    const { role } = req.body;
-    if (!['attendee', 'organizer', 'admin'].includes(role)) {
-      return res.status(400).json({ message: 'Invalid role' });
-    }
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    if (user.isSuperAdmin && role !== 'admin') {
-      return res.status(400).json({ message: 'Cannot change super administrator role' });
-    }
-    if (String(user._id) === String(req.user.userId) && role !== 'admin') {
-      return res.status(400).json({ message: 'Cannot change your own admin role' });
-    }
-    if (user.role === 'admin' && role !== 'admin') {
-      const requester = await User.findById(req.user.userId);
-      const isRequesterSuperAdmin = Boolean(requester && requester.isSuperAdmin);
-      if (!isRequesterSuperAdmin) {
-        const activeAdmins = await User.countDocuments({ role: 'admin', status: 'active' });
-        if (activeAdmins <= 1) {
-          return res.status(400).json({ message: 'Cannot demote the last active administrator' });
-        }
-      }
-    }
-    user.role = role;
-    await user.save();
-    res.json({ id: user._id, name: user.name, email: user.email, role: user.role, status: user.status });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// PATCH /api/admin/users/:id/status
-exports.updateUserStatus = async (req, res, next) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: 'Invalid user ID' });
-    }
-    const { status } = req.body;
-    if (!['active', 'suspended'].includes(status)) {
-      return res.status(400).json({ message: 'Invalid status' });
-    }
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    if (user.isSuperAdmin && status === 'suspended') {
-      return res.status(400).json({ message: 'Cannot suspend super administrator' });
-    }
-    if (String(user._id) === String(req.user.userId) && status === 'suspended') {
-      return res.status(400).json({ message: 'Cannot suspend your own account' });
-    }
-    if (user.role === 'admin' && status === 'suspended') {
-      const requester = await User.findById(req.user.userId);
-      const isRequesterSuperAdmin = Boolean(requester && requester.isSuperAdmin);
-      if (!isRequesterSuperAdmin) {
-        const activeAdmins = await User.countDocuments({ role: 'admin', status: 'active' });
-        if (activeAdmins <= 1) {
-          return res.status(400).json({ message: 'Cannot suspend the last active administrator' });
-        }
-      }
-    }
-    user.status = status;
-    await user.save();
-    res.json({ id: user._id, name: user.name, email: user.email, role: user.role, status: user.status });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// DELETE /api/admin/users/:id
-exports.deleteUser = async (req, res, next) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: 'Invalid user ID' });
-    }
-    if (String(req.params.id) === String(req.user.userId)) {
-      return res.status(400).json({ message: 'Cannot delete your own account' });
-    }
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    if (user.isSuperAdmin) {
-      return res.status(400).json({ message: 'Cannot delete super administrator' });
-    }
-    if (user.role === 'admin' && user.status === 'active') {
-      const requester = await User.findById(req.user.userId);
-      const isRequesterSuperAdmin = Boolean(requester && requester.isSuperAdmin);
-      if (!isRequesterSuperAdmin) {
-        const activeAdmins = await User.countDocuments({ role: 'admin', status: 'active' });
-        if (activeAdmins <= 1) {
-          return res.status(400).json({ message: 'Cannot delete the last active administrator' });
-        }
-      }
-    }
-    await user.deleteOne();
-    res.json({ message: 'User deleted' });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// DELETE /api/admin/events/:id — admin deletes any event and its registrations
-exports.deleteEvent = async (req, res, next) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ message: 'Invalid event ID' });
-    }
-    const event = await Event.findById(req.params.id);
-    if (!event) return res.status(404).json({ message: 'Event not found' });
-    await Registration.deleteMany({ event: req.params.id });
-    await event.deleteOne();
-    res.json({ message: 'Event and its registrations deleted' });
   } catch (err) {
     next(err);
   }
