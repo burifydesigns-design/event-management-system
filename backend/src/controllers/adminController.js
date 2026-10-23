@@ -329,13 +329,20 @@ exports.updateUserRole = async (req, res, next) => {
     }
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
+    if (user.isSuperAdmin && role !== 'admin') {
+      return res.status(400).json({ message: 'Cannot change super administrator role' });
+    }
     if (String(user._id) === String(req.user.userId) && role !== 'admin') {
       return res.status(400).json({ message: 'Cannot change your own admin role' });
     }
     if (user.role === 'admin' && role !== 'admin') {
-      const activeAdmins = await User.countDocuments({ role: 'admin', status: 'active' });
-      if (activeAdmins <= 1) {
-        return res.status(400).json({ message: 'Cannot demote the last active administrator' });
+      const requester = await User.findById(req.user.userId);
+      const isRequesterSuperAdmin = Boolean(requester && requester.isSuperAdmin);
+      if (!isRequesterSuperAdmin) {
+        const activeAdmins = await User.countDocuments({ role: 'admin', status: 'active' });
+        if (activeAdmins <= 1) {
+          return res.status(400).json({ message: 'Cannot demote the last active administrator' });
+        }
       }
     }
     user.role = role;
@@ -358,13 +365,20 @@ exports.updateUserStatus = async (req, res, next) => {
     }
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
+    if (user.isSuperAdmin && status === 'suspended') {
+      return res.status(400).json({ message: 'Cannot suspend super administrator' });
+    }
     if (String(user._id) === String(req.user.userId) && status === 'suspended') {
       return res.status(400).json({ message: 'Cannot suspend your own account' });
     }
     if (user.role === 'admin' && status === 'suspended') {
-      const activeAdmins = await User.countDocuments({ role: 'admin', status: 'active' });
-      if (activeAdmins <= 1) {
-        return res.status(400).json({ message: 'Cannot suspend the last active administrator' });
+      const requester = await User.findById(req.user.userId);
+      const isRequesterSuperAdmin = Boolean(requester && requester.isSuperAdmin);
+      if (!isRequesterSuperAdmin) {
+        const activeAdmins = await User.countDocuments({ role: 'admin', status: 'active' });
+        if (activeAdmins <= 1) {
+          return res.status(400).json({ message: 'Cannot suspend the last active administrator' });
+        }
       }
     }
     user.status = status;
@@ -386,10 +400,17 @@ exports.deleteUser = async (req, res, next) => {
     }
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
+    if (user.isSuperAdmin) {
+      return res.status(400).json({ message: 'Cannot delete super administrator' });
+    }
     if (user.role === 'admin' && user.status === 'active') {
-      const activeAdmins = await User.countDocuments({ role: 'admin', status: 'active' });
-      if (activeAdmins <= 1) {
-        return res.status(400).json({ message: 'Cannot delete the last active administrator' });
+      const requester = await User.findById(req.user.userId);
+      const isRequesterSuperAdmin = Boolean(requester && requester.isSuperAdmin);
+      if (!isRequesterSuperAdmin) {
+        const activeAdmins = await User.countDocuments({ role: 'admin', status: 'active' });
+        if (activeAdmins <= 1) {
+          return res.status(400).json({ message: 'Cannot delete the last active administrator' });
+        }
       }
     }
     await user.deleteOne();

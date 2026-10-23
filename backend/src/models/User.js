@@ -13,8 +13,12 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     role: {
       type: String,
-      enum: ['attendee', 'organizer', 'admin'],
+      enum: ['attendee', 'organizer', 'admin', 'coordinator'],
       default: 'attendee',
+    },
+    isSuperAdmin: {
+      type: Boolean,
+      default: false,
     },
     status: {
       type: String,

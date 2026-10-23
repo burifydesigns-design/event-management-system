@@ -14,6 +14,7 @@ const scanRoutes = require('./routes/scanRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const coordinatorRoutes = require('./routes/coordinatorRoutes');
 const errorHandler = require('./middleware/errorHandler');
 const connectDB = require('./config/db');
 const mongoose = require('mongoose');
@@ -81,6 +82,19 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth', authLimiter);
 
+// Stricter rate limit for sensitive check-in / ticket issuance / email resend endpoints.
+const sensitiveLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many requests, please try again later' },
+});
+app.use('/api/tickets/check-in', sensitiveLimiter);
+app.use('/api/tickets/issue', sensitiveLimiter);
+app.use('/api/tickets/*/resend-email', sensitiveLimiter);
+app.use('/api/scan', sensitiveLimiter);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/registrations', registrationRoutes);
@@ -91,12 +105,12 @@ app.use('/api/scan', scanRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/coordinator', coordinatorRoutes);
 
 app.get('/api/health', async (_req, res) => {
   let dbStatus = 'unknown';
   try {
     const state = mongoose.connection.readyState;
-    // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
     dbStatus = state === 1 ? 'connected' : 'disconnected';
   } catch (_err) {
     dbStatus = 'error';

@@ -2,7 +2,7 @@
 
 Base URL: `http://localhost:5000/api` (development).  
 Content-Type: `application/json`. Authentication: `Authorization: Bearer <jwt>` unless noted.  
-Roles: `attendee`, `organizer`, `admin`.
+Roles: `attendee`, `organizer`, `admin`, `coordinator`.
 
 ## Authentication
 
@@ -86,17 +86,79 @@ Registration owner or event organizer/admin.
 Ticket (registration) visible to owner or event organizer/admin.
 
 ### GET /api/tickets/:id/qr
-Server-generated QR data URL for the ticket number. Same authorization. QR payload contains only the ticket number — no passwords, tokens, or PII.
+Server-generated QR data URL for the ticket token. Same authorization. QR payload contains only the ticket token — no passwords, tokens, or PII.
+
+### POST /api/tickets/issue
+Organizer/admin issues a ticket for an attendee to an event. Idempotent (no duplicate tickets for same user+event). Requires confirmed payment for paid orders.
+- Body: `{ userId, eventId, ticketTypeId?, orderId? }`
+- Response `201`: `{ ticket: { id, ticketNumber, qrToken, status, checkedIn, ... }, created: boolean }`
 
 ### POST /api/tickets/validate
-Organizer/admin validates a ticket for their event.
-- Body: `{ ticketNumber, eventId }`
-- Response: `{ valid, ticketNumber, status, checkedIn, event, user }`
+Organizer/admin/coordinator pre-checks a ticket before check-in. No state change.
+- Body: `{ qrToken, eventId }`
+- Response: `{ valid, ticketNumber, status, checkedIn, event, attendee }`
 
 ### POST /api/tickets/check-in
-Organizer/admin checks in an attendee. Atomic update prevents duplicate check-ins. Records `checkedInAt` and `checkedInBy`.
-- Body: `{ ticketNumber, eventId }`
-- Response: `{ message, ticketNumber, checkedInAt }`
+Organizer/admin/coordinator atomically checks in a ticket. Coordinator limited to assigned events. Atomic `findOneAndUpdate` prevents duplicate check-ins under concurrency.
+- Body: `{ qrToken, eventId }`
+- Response: `{ result: 'valid'|'already_used'|'invalid'|'cancelled'|'wrong_event', message, ticketNumber, checkedIn }`
+
+### POST /api/tickets/:id/resend-email
+Owner or event staff resends the ticket email. Queues a new delivery attempt tracked in `TicketEmailLog`.
+- Response `200`: `{ message: 'Ticket email queued', emailLogId }`
+
+### GET /api/tickets/my
+Authenticated attendee's own tickets. Paginated.
+
+### POST /api/scan
+Coordinator/organizer/admin scans a ticket QR code at the venue. Coordinator limited to assigned events.
+- Body: `{ qrToken, eventId }`
+- Response: `{ valid, result, message, ticketNumber }`
+
+### GET /api/scan/events
+Events the authenticated user is authorized to scan (admin: all published; organizer: own events; coordinator: assigned events).
+
+### GET /api/scan/history
+Check-in history for the authenticated staff member (admin/organizer: their events' scans; coordinator: own scans). Paginated.
+
+## Coordinator Assignments
+
+### POST /api/coordinator/assignments
+Admin or organizer assigns a coordinator to an event. Organizer limited to their own events.
+- Body: `{ coordinatorId, eventId }`
+- Response `201`: `{ assignment }`
+
+### GET /api/coordinator/assignments
+List assignments (admin: all; organizer: own events; coordinator: own). Paginated.
+
+### DELETE /api/coordinator/assignments/:id
+Remove a coordinator assignment. Organizer limited to their own events.
+
+### GET /api/coordinator/me/events
+Events assigned to the authenticated coordinator.
+
+### GET /api/coordinator/coordinators
+List active coordinator users (admin/organizer).
+
+## Analytics
+
+### GET /api/analytics/overview
+Admin only. Platform-wide metrics: users, events, registrations, attendance rate, gross revenue, paid orders, registration and check-in trends.
+
+### GET /api/analytics/events/:id
+Event-specific stats. Organizer/admin/coordinator of the event. Capacity utilization, confirmed/cancelled/checked-in counts, revenue, ticket-type sales, registration/check-in trends, hourly arrivals.
+
+### GET /api/analytics/platform
+Admin only. Platform-wide trends with date range (`start`, `end` query params, max 365 days). Registrations, check-ins, revenue over time; events by category; top events.
+
+### GET /api/analytics/organizer
+Organizer-scoped analytics across their events with date range filters. Revenue, registrations, check-ins, capacity utilization per event.
+
+### GET /api/analytics/coordinator-performance
+Admin/organizer/coordinator. Coordinator scan counts and outcomes (valid, failed, already used, wrong event, cancelled) with date range filters.
+
+### GET /api/analytics/export/csv
+Admin/organizer/coordinator. Export registrations as CSV scoped by role (admin: all; organizer: own events; coordinator: assigned events). Optional `eventId` filter.
 
 ## Admin
 
@@ -112,7 +174,7 @@ List users (no passwords). Paginated.
 Single user (no password).
 
 ### PATCH /api/admin/users/:id/role
-Change role (`attendee`/`organizer`/`admin`). Cannot demote the last active administrator or change your own admin role.
+Change role (`attendee`/`organizer`/`admin`/`coordinator`). Cannot demote the last active administrator or change your own admin role.
 
 ### PATCH /api/admin/users/:id/status
 Activate/suspend an account. Cannot suspend the last active administrator or yourself.
@@ -132,18 +194,25 @@ Paginated attendees for an event (with user details).
 ### GET /api/admin/events/:eventId/attendees/export
 CSV export of all registrations for an event (not just the current page). Fields escaped; formula injection protected.
 
-## Analytics
+## Orders & Payments
 
-### GET /api/analytics/overview
-Admin only. Platform metrics: total/published/upcoming events, total/confirmed/cancelled/checked-in registrations, attendance rate, registration trends over time.
+### POST /api/orders
+Attendee creates an order for ticket(s). Order starts as `pending`; tickets are issued after payment confirmation.
+- Body: `{ eventId, ticketTypeId, quantity }`
 
-### GET /api/analytics/events/:id
-Event-specific stats. Organizer of the event or admin. Capacity utilization, confirmed/cancelled/checked-in counts, attendance rate, registration trends.
+### GET /api/orders/my-tickets
+Attendee's own ticket instances.
+
+### POST /api/orders/confirm-payment
+Attendee/organizer/admin confirms payment for an order and issues tickets. In production this should be triggered by a verified payment webhook.
+- Body: `{ orderId }`
 
 ## System
 
 ### GET /api/health
 Service status and database health indicator. No secrets or internals exposed.
+
+Rate limiting applies to `/api/auth` (20 requests / 15 min) and sensitive endpoints (`/api/tickets/check-in`, `/api/tickets/issue`, `/api/tickets/*/resend-email`, `/api/scan`) at 60 requests / 1 min.
 
 ## Pagination contract
 List responses use:

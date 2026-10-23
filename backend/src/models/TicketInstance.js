@@ -6,12 +6,21 @@ const ticketInstanceSchema = new mongoose.Schema(
     ticketType: { type: mongoose.Schema.Types.ObjectId, ref: 'TicketType', required: true },
     event: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true },
     attendee: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    registration: { type: mongoose.Schema.Types.ObjectId, ref: 'Registration', default: null },
     qrToken: { type: String, required: true, unique: true }, // encoded into the QR code
-    status: { type: String, enum: ['valid', 'used', 'void'], default: 'valid' },
+    status: {
+      type: String,
+      enum: ['pending', 'issued', 'used', 'void', 'cancelled', 'refunded'],
+      default: 'issued',
+    },
     scannedAt: Date,
     scannedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
 );
+
+ticketInstanceSchema.index({ qrToken: 1 });
+ticketInstanceSchema.index({ event: 1, status: 1 });
+ticketInstanceSchema.index({ attendee: 1 });
 
 module.exports = mongoose.model('TicketInstance', ticketInstanceSchema);

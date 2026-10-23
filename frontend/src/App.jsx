@@ -16,6 +16,8 @@ import Dashboard from './pages/Dashboard'
 import AttendeeDashboard from './pages/AttendeeDashboard'
 import OrganizerDashboard from './pages/OrganizerDashboard'
 import AdminDashboard from './pages/AdminDashboard'
+import CoordinatorDashboard from './pages/CoordinatorDashboard'
+import ScannerPage from './pages/ScannerPage'
 import AdminEvents from './pages/AdminEvents'
 import AdminUsers from './pages/AdminUsers'
 import AdminAttendees from './pages/AdminAttendees'
@@ -59,6 +61,12 @@ function App() {
               <Route path="/admin/check-in" element={<AdminCheckIn />} />
               <Route path="/admin/analytics" element={<AdminAnalytics />} />
             </Route>
+            <Route element={<ProtectedRoute allowedRoles={['coordinator', 'organizer', 'admin']} />}>
+              <Route path="/scanner" element={<ScannerPage />} />
+            </Route>
+            <Route element={<ProtectedRoute allowedRoles={['coordinator']} />}>
+              <Route path="/dashboard/coordinator" element={<CoordinatorDashboard />} />
+            </Route>
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
@@ -69,5 +77,3 @@ function App() {
 }
 
 export default App
-
-

@@ -14,6 +14,7 @@ export default function Navbar() {
     if (!user) return '/'
     if (user.role === 'admin') return '/dashboard/admin'
     if (user.role === 'organizer') return '/dashboard/organizer'
+    if (user.role === 'coordinator') return '/dashboard/coordinator'
     return '/dashboard/attendee'
   }
 
@@ -60,6 +61,24 @@ export default function Navbar() {
               onClick={closeMenu}
             >
               Create Event
+            </Link>
+          )}
+          {(user.role === 'coordinator' || user.role === 'organizer' || user.role === 'admin') && (
+            <Link
+              to="/scanner"
+              className="navbar-link navbar-link--scanner"
+              onClick={closeMenu}
+            >
+              📷 Scanner
+            </Link>
+          )}
+          {user.role === 'coordinator' && (
+            <Link
+              to="/dashboard/coordinator"
+              className="navbar-link"
+              onClick={closeMenu}
+            >
+              Coordinator
             </Link>
           )}
           {user.role === 'admin' && (

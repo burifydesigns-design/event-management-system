@@ -19,7 +19,7 @@ exports.createStaffUser = async (req, res, next) => {
       email,
       password: hashed,
       role,
-      createdBy: req.user._id,
+      createdBy: req.user.userId,
     });
 
     res.status(201).json({ id: user._id, name: user.name, email: user.email, role: user.role });

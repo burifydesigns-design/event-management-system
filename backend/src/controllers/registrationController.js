@@ -3,7 +3,8 @@ const Registration = require('../models/Registration');
 const mongoose = require('mongoose');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { generateTicketToken } = require('../services/qrService');
-const { sendRegistrationEmail } = require('../services/emailService');
+const { sendTicketEmail } = require('../services/emailService');
+const TicketEmailLog = require('../models/TicketEmailLog');
 
 function generateTicketNumber() {
   return 'EVT-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -26,16 +27,35 @@ exports.registerForEvent = async (req, res, next) => {
     const currentRegistrations = await Registration.countDocuments({ event: eventId, status: 'confirmed' });
     if (currentRegistrations >= event.capacity) return res.status(409).json({ message: 'Event is full' });
     const ticketNumber = generateTicketNumber();
+    const qrToken = generateTicketToken();
     let registration;
     try {
-      registration = await Registration.create({ user: req.user.userId, event: eventId, ticketNumber: ticketNumber });
+      registration = await Registration.create({
+        user: req.user.userId,
+        event: eventId,
+        ticketNumber,
+        qrToken,
+        status: 'confirmed',
+      });
     } catch (err) {
       if (err.code === 11000) return res.status(409).json({ message: 'Already registered for this event' });
       throw err;
     }
+
+    // Queue the ticket email (non-blocking). Delivery tracked via TicketEmailLog.
+    const emailLog = await TicketEmailLog.create({
+      registration: registration._id,
+      status: 'pending',
+      attempts: 0,
+    });
+    sendTicketEmail(registration, emailLog._id).catch(function() {});
+
     try { await event.populate('organizer', 'name email'); } catch(e){}
     const eventDetails = { name: event.title, date: event.date, time: event.time, location: event.location, city: event.city };
-    if (req.user.email) { sendRegistrationEmail(req.user.email, eventDetails, ticketNumber).catch(function(){}); }
+    if (req.user.email) {
+      const { sendRegistrationEmail } = require('../services/emailService');
+      sendRegistrationEmail(req.user.email, eventDetails, ticketNumber).catch(function(){});
+    }
     res.status(201).json({ ...registration.toObject(), event: { id: event._id, title: event.title, date: event.date, time: event.time, location: event.location, city: event.city } });
   } catch (err) { next(err); }
 };
