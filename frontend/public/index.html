@@ -7,8 +7,50 @@
 <link rel="stylesheet" href="../assets/css/attendee.css">
 </head>
 <body>
-<h1>Browse Events</h1>
-<!-- TODO: build this page -->
+<header class="site-header">
+  <div class="container">
+    <a href="index.html" class="logo">EventHub</a>
+    <nav>
+      <a href="login.html">Log In</a>
+      <a href="signup.html">Sign Up</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+  <h1>Browse Events</h1>
+
+  <section class="filters">
+    <input type="text" id="searchInput" placeholder="Search events by title, description, or city" />
+    <select id="categoryFilter">
+      <option value="">All Categories</option>
+      <option value="Music">Music</option>
+      <option value="Sports">Sports</option>
+      <option value="Tech">Tech</option>
+      <option value="Food">Food</option>
+      <option value="Arts">Arts</option>
+      <option value="Other">Other</option>
+    </select>
+    <select id="priceFilter">
+      <option value="">All Prices</option>
+      <option value="free">Free</option>
+      <option value="paid">Paid</option>
+    </select>
+    <button id="applyFilters">Apply Filters</button>
+  </section>
+
+  <div id="eventsContainer" class="events-grid">
+    <p class="loading">Loading events...</p>
+  </div>
+
+  <section id="pagination" class="pagination">
+    <button id="prevPage" disabled>Previous</button>
+    <span id="pageInfo">Page 1 of 1</span>
+    <button id="nextPage" disabled>Next</button>
+  </section>
+</main>
+
 <script src="../assets/js/api.js" defer></script>
+<script src="../assets/js/attendee/events.js" defer></script>
 </body>
 </html>

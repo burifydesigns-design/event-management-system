@@ -1,26 +1,131 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+﻿import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { Link } from 'react-router-dom'
 
 export default function Navbar() {
-  const [isOpen, setIsOpen] = useState(false)
   const { user, logout } = useAuth()
-  const navigate = useNavigate()
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
-  const handleLogout = () => {
-    logout()
-    navigate('/events')
+  const toggleMenu = () => setIsMenuOpen((prev) => !prev)
+
+  const closeMenu = () => setIsMenuOpen(false)
+
+  const getDashboardLink = () => {
+    if (!user) return '/'
+    if (user.role === 'admin') return '/dashboard/admin'
+    if (user.role === 'organizer') return '/dashboard/organizer'
+    if (user.role === 'coordinator') return '/dashboard/coordinator'
+    return '/dashboard/attendee'
   }
 
-  const navLinks = [
-    { to: '/', label: 'Home' },
-    { to: '/events', label: 'Events' },
-  ]
+  const navLinks = (
+    <>
+      <Link to="/" className="navbar-link" onClick={closeMenu}>
+        Home
+      </Link>
+      <Link to="/events" className="navbar-link" onClick={closeMenu}>
+        Events
+      </Link>
 
-  if (user) {
-    navLinks.push({ to: '/my-events', label: 'My Events' })
-    navLinks.push({ to: '/profile', label: 'Profile' })
-  }
+      {user ? (
+        <>
+          <Link
+            to={getDashboardLink()}
+            className="navbar-link"
+            onClick={closeMenu}
+          >
+            Dashboard
+          </Link>
+          {user.role === 'attendee' && (
+            <>
+              <Link
+                to="/my-events"
+                className="navbar-link"
+                onClick={closeMenu}
+              >
+                My Events
+              </Link>
+              <Link
+                to="/profile"
+                className="navbar-link"
+                onClick={closeMenu}
+              >
+                Profile
+              </Link>
+            </>
+          )}
+          {(user.role === 'organizer' || user.role === 'admin') && (
+            <Link
+              to="/create-event"
+              className="navbar-link"
+              onClick={closeMenu}
+            >
+              Create Event
+            </Link>
+          )}
+          {(user.role === 'coordinator' || user.role === 'organizer' || user.role === 'admin') && (
+            <Link
+              to="/scanner"
+              className="navbar-link navbar-link--scanner"
+              onClick={closeMenu}
+            >
+              📷 Scanner
+            </Link>
+          )}
+          {user.role === 'coordinator' && (
+            <Link
+              to="/dashboard/coordinator"
+              className="navbar-link"
+              onClick={closeMenu}
+            >
+              Coordinator
+            </Link>
+          )}
+          {user.role === 'admin' && (
+            <>
+              <Link
+                to="/admin/users"
+                className="navbar-link"
+                onClick={closeMenu}
+              >
+                Users
+              </Link>
+              <Link
+                to="/admin/analytics"
+                className="navbar-link"
+                onClick={closeMenu}
+              >
+                Analytics
+              </Link>
+            </>
+          )}
+          <div className="navbar-user">
+            <span className="navbar-user-name">{user.name} ({user.role})</span>
+            <button onClick={logout} className="navbar-logout">
+              Logout
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <Link
+            to="/login"
+            className="navbar-link"
+            onClick={closeMenu}
+          >
+            Login
+          </Link>
+          <Link
+            to="/register"
+            className="navbar-link navbar-link--primary"
+            onClick={closeMenu}
+          >
+            Register
+          </Link>
+        </>
+      )}
+    </>
+  )
 
   return (
     <nav className="navbar">
@@ -32,50 +137,19 @@ export default function Navbar() {
 
         <button
           className="navbar-toggle"
-          onClick={() => setIsOpen(!isOpen)}
-          aria-label="Toggle navigation"
+          onClick={toggleMenu}
+          aria-expanded={isMenuOpen}
+          aria-controls="mobile-menu"
+          aria-label="Toggle navigation menu"
         >
-          <span></span>
-          <span></span>
-          <span></span>
+          ☰
         </button>
 
-        <div className={`navbar-menu ${isOpen ? 'navbar-menu--open' : ''}`}>
-          <div className="navbar-nav">
-            {navLinks.map((link) => (
-              <Link
-                key={link.to}
-                to={link.to}
-                className="navbar-link"
-                onClick={() => setIsOpen(false)}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-
-          <div className="navbar-actions">
-            {user ? (
-              <div className="navbar-user">
-                <Link to="/profile" className="navbar-user-link" onClick={() => setIsOpen(false)}>
-                  <span className="user-avatar">{user.name?.charAt(0).toUpperCase()}</span>
-                  <span className="user-name">{user.name}</span>
-                </Link>
-                <button onClick={handleLogout} className="btn btn-outline btn-sm">
-                  Logout
-                </button>
-              </div>
-            ) : (
-              <div className="navbar-auth">
-                <Link to="/login" className="btn btn-outline btn-sm" onClick={() => setIsOpen(false)}>
-                  Login
-                </Link>
-                <Link to="/register" className="btn btn-primary btn-sm" onClick={() => setIsOpen(false)}>
-                  Register
-                </Link>
-              </div>
-            )}
-          </div>
+        <div
+          id="mobile-menu"
+          className={`navbar-menu ${isMenuOpen ? 'navbar-menu--open' : ''}`}
+        >
+          {navLinks}
         </div>
       </div>
     </nav>

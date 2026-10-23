@@ -1,5 +1,6 @@
 const Event = require('../models/Event');
 const mongoose = require('mongoose');
+const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 
 const today = () => {
   const d = new Date();
@@ -9,7 +10,10 @@ const today = () => {
 
 exports.listEvents = async (req, res, next) => {
   try {
-    const { search, category, city, date, price, page = 1, limit = 12 } = req.query;
+    const { search, category, city, date, price } = req.query;
+    const { page, limit, skip, error } = parsePagination(req.query);
+    if (error) return res.status(400).json({ message: error });
+
     const query = { status: 'published' };
 
     if (search) {
@@ -27,13 +31,20 @@ exports.listEvents = async (req, res, next) => {
     if (price === 'paid') query.price = { $gt: 0 };
 
     const totalEvents = await Event.countDocuments(query);
+    // Deterministic sort with a unique tie-breaker (_id) so records are not
+    // duplicated or skipped across page boundaries.
     const events = await Event.find(query)
       .populate('organizer', 'name email')
-      .skip((page - 1) * limit)
-      .limit(Number(limit))
-      .sort({ date: 1 });
+      .sort({ date: 1, _id: 1 })
+      .skip(skip)
+      .limit(limit);
 
-    res.json({ events, page: Number(page), limit: Number(limit), totalEvents, totalPages: Math.ceil(totalEvents / limit) });
+    const pagination = buildPaginationMeta({ page, limit, totalItems: totalEvents });
+
+    // Legacy fields (page, limit, totalEvents, totalPages) are kept for
+    // backward compatibility with existing consumers; new consumers should
+    // use the `pagination` object.
+    res.json({ events, page, limit, totalEvents, totalPages: pagination.totalPages, pagination });
   } catch (err) {
     next(err);
   }
@@ -68,7 +79,7 @@ exports.updateEvent = async (req, res, next) => {
     if (String(event.organizer) !== String(req.user.userId) && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not your event' });
     }
-    const updated = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const updateData = { ...req.body }; delete updateData.organizer; delete updateData._id; const updated = await Event.findByIdAndUpdate(req.params.id, updateData, { new: true });
     res.json(updated);
   } catch (err) {
     next(err);

@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const auth = require('../middleware/authMiddleware');
-const { validateEvent } = require('../middleware/validationMiddleware');
+const role = require('../middleware/roleMiddleware');
+const { validateEvent, validateEventUpdate, validatePaginationQuery, validateObjectIdParam } = require('../middleware/validationMiddleware');
 const {
   listEvents,
   getEvent,
@@ -10,11 +11,11 @@ const {
   publishEvent,
 } = require('../controllers/eventController');
 
-router.get('/', listEvents);
-router.get('/:id', getEvent);
-router.post('/', auth, validateEvent, createEvent);
-router.put('/:id', auth, updateEvent);
-router.delete('/:id', auth, deleteEvent);
-router.patch('/:id/publish', auth, publishEvent);
+router.get('/', validatePaginationQuery, listEvents);
+router.get('/:id', validateObjectIdParam('id'), getEvent);
+router.post('/', auth, role('organizer', 'admin'), validateEvent, createEvent);
+router.put('/:id', auth, validateObjectIdParam('id'), validateEventUpdate, updateEvent);
+router.delete('/:id', auth, validateObjectIdParam('id'), deleteEvent);
+router.patch('/:id/publish', auth, validateObjectIdParam('id'), publishEvent);
 
 module.exports = router;
