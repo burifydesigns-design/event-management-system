@@ -1,34 +1,35 @@
-const mongoose = require('mongoose');
+const db = require('../lib/db');
+const TABLE = 'events';
 
-const eventSchema = new mongoose.Schema(
-  {
-    title: { type: String, required: true, trim: true },
-    description: { type: String, required: true, trim: true },
-    category: { type: String, required: true, trim: true },
-    date: { type: Date, required: true },
-    time: { type: String, required: true },
-    location: { type: String, required: true, trim: true },
-    city: { type: String, required: true, trim: true },
-    capacity: { type: Number, required: true, min: 1 },
-    price: { type: Number, default: 0, min: 0 },
-    image: { type: String, default: "" },
-    // Per-event poster/ticket colors. colorA = main halftone color, colorB = halftone dot color.
-    // Organizer picks from a fixed preset when creating; defaults fall back to the first preset.
-    colorA: { type: String, default: "#c42a55" },
-    colorB: { type: String, default: "#ffb703" },
-    organizer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    status: {
-      type: String,
-      enum: ['draft', 'published', 'cancelled'],
-      default: 'draft',
-    },
-    registrationDeadline: { type: Date },
+module.exports = {
+  async findOne(opts) {
+    return db.findOne(TABLE, opts);
   },
-  { timestamps: true }
-);
-
-eventSchema.index({ status: 1, date: 1 });
-eventSchema.index({ category: 1, date: 1 });
-eventSchema.index({ organizer: 1, status: 1 });
-
-module.exports = mongoose.model('Event', eventSchema);
+  async findById(id, opts) {
+    return db.findById(TABLE, id, opts);
+  },
+  async find(opts) {
+    return db.find(TABLE, opts);
+  },
+  async create(data) {
+    return db.create(TABLE, data);
+  },
+  async findByIdAndUpdate(id, data) {
+    return db.updateById(TABLE, id, data);
+  },
+  async findOneAndUpdate(filter, data) {
+    return db.updateOne(TABLE, filter, data);
+  },
+  async countDocuments(filter) {
+    return db.count(TABLE, filter);
+  },
+  async distinct(field, filter) {
+    return db.distinct(TABLE, field, filter);
+  },
+  async updateMany(filter, data) {
+    return db.updateMany(TABLE, filter, data);
+  },
+  async removeById(id) {
+    return db.removeById(TABLE, id);
+  },
+};

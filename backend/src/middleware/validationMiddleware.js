@@ -1,5 +1,5 @@
-const mongoose = require('mongoose');
 const validator = require('validator');
+const { isValidUuid } = require('../config/supabase');
 
 function validateEmailFormat(email) {
   if (typeof email !== 'string') return false;
@@ -8,7 +8,7 @@ function validateEmailFormat(email) {
 
 function isValidObjectId(id) {
   if (typeof id !== 'string') return false;
-  return mongoose.Types.ObjectId.isValid(id);
+  return isValidUuid(id);
 }
 
 function validateRegister(req, res, next) {
@@ -101,9 +101,9 @@ function validateEvent(req, res, next) {
 }
 
 function validateEventUpdate(req, res, next) {
-  const protected = ['organizer', 'status', '_id', 'createdAt', 'updatedAt', '__v'];
-  for (let i = 0; i < protected.length; i++) {
-    const fieldName = protected[i];
+  const protectedFields = ['organizer', 'status', '_id', 'createdAt', 'updatedAt'];
+  for (let i = 0; i < protectedFields.length; i++) {
+    const fieldName = protectedFields[i];
     if (fieldName in req.body) delete req.body[fieldName];
   }
   if (req.body.capacity !== undefined) {

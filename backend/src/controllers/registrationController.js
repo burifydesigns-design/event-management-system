@@ -18,7 +18,9 @@ exports.registerForEvent = async (req, res, next) => {
     const currentRegistrations = await Registration.countDocuments({ event: eventId, status: 'confirmed' });
     if (currentRegistrations >= event.capacity) return res.status(409).json({ message: 'Event is full' });
 
-    const existingRegistration = await Registration.findOne({ user: req.user.userId, event: eventId });
+    const existingRegistration = await Registration.findOne({
+      filter: { user: req.user.userId, event: eventId },
+    });
     if (existingRegistration) return res.status(409).json({ message: 'Already registered for this event' });
 
     const ticketNumber = generateTicketNumber();
@@ -28,7 +30,6 @@ exports.registerForEvent = async (req, res, next) => {
       ticketNumber,
     });
 
-    await event.populate('organizer', 'name email');
     const eventDetails = {
       name: event.title,
       date: event.date,
@@ -40,7 +41,7 @@ exports.registerForEvent = async (req, res, next) => {
     sendRegistrationEmail(req.user.email, eventDetails, ticketNumber).catch(() => {});
 
     res.status(201).json({
-      ...registration.toObject(),
+      ...registration,
       event: {
         id: event._id,
         title: event.title,
@@ -57,9 +58,11 @@ exports.registerForEvent = async (req, res, next) => {
 
 exports.getMyEvents = async (req, res, next) => {
   try {
-    const registrations = await Registration.find({ user: req.user.userId, status: 'confirmed' })
-      .populate('event')
-      .sort({ registeredAt: -1 });
+    const { rows: registrations } = await Registration.find({
+      filter: { user: req.user.userId, status: 'confirmed' },
+      populate: 'event',
+      sort: { registeredAt: -1 },
+    });
     res.json(registrations);
   } catch (err) {
     next(err);
@@ -68,7 +71,7 @@ exports.getMyEvents = async (req, res, next) => {
 
 exports.getRegistration = async (req, res, next) => {
   try {
-    const registration = await Registration.findById(req.params.id).populate('event');
+    const registration = await Registration.findById(req.params.id, { populate: 'event' });
     if (!registration) return res.status(404).json({ message: 'Registration not found' });
     if (String(registration.user) !== String(req.user.userId) && !['admin', 'organizer'].includes(req.user.role)) {
       return res.status(403).json({ message: 'Not authorized' });
@@ -91,10 +94,9 @@ exports.cancelRegistration = async (req, res, next) => {
       return res.status(400).json({ message: 'Cannot cancel registration for past event' });
     }
     if (String(registration.user) === String(req.user.userId)) {
-      registration.status = 'cancelled';
-      await registration.save();
+      await Registration.findByIdAndUpdate(registration.id, { status: 'cancelled' });
     } else {
-      await registration.deleteOne();
+      await Registration.removeById(registration.id);
     }
     res.json({ message: 'Registration cancelled' });
   } catch (err) {

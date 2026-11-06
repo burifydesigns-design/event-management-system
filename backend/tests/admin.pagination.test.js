@@ -1,13 +1,11 @@
 const request = require('supertest');
-const mongoose = require('mongoose');
 const { setupTestApp, teardownTestApp, clearDatabase, authToken } = require('./helpers');
 
-let Event;
-let User;
-let Registration;
+const Event = require('../src/models/Event');
+const User = require('../src/models/User');
+const Registration = require('../src/models/Registration');
 
 let app;
-let mongoServer;
 let adminToken;
 let attendeeToken;
 let otherAttendeeToken;
@@ -60,14 +58,11 @@ async function seedRegistrations(eventDoc, count, { prefix = 'user', ticketPrefi
 }
 
 beforeAll(async () => {
-  ({ app, mongoServer } = await setupTestApp());
-  Event = mongoose.model('Event');
-  User = mongoose.model('User');
-  Registration = mongoose.model('Registration');
+  ({ app } = await setupTestApp());
 });
 
 afterAll(async () => {
-  await teardownTestApp(mongoServer);
+  await teardownTestApp();
 });
 
 beforeEach(async () => {

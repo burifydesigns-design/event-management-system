@@ -1,27 +1,35 @@
-const mongoose = require('mongoose');
+const db = require('../lib/db');
+const TABLE = 'registrations';
 
-const registrationSchema = new mongoose.Schema(
-  {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    event: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true },
-    ticketNumber: { type: String, required: true, unique: true, trim: true },
-    status: {
-      type: String,
-      enum: ['confirmed', 'cancelled'],
-      default: 'confirmed',
-    },
-    cancelledAt: { type: Date, default: null },
-    cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-    checkedIn: { type: Boolean, default: false },
-    checkedInAt: { type: Date, default: null },
-    checkedInBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-    registeredAt: { type: Date, default: Date.now },
+module.exports = {
+  async findOne(opts) {
+    return db.findOne(TABLE, opts);
   },
-  { timestamps: true, autoIndex: true }
-);
-
-registrationSchema.index({ user: 1, event: 1 }, { unique: true });
-registrationSchema.index({ event: 1, status: 1 });
-registrationSchema.index({ user: 1, status: 1 });
-
-module.exports = mongoose.model('Registration', registrationSchema);
+  async findById(id, opts) {
+    return db.findById(TABLE, id, opts);
+  },
+  async find(opts) {
+    return db.find(TABLE, opts);
+  },
+  async create(data) {
+    return db.create(TABLE, data);
+  },
+  async findByIdAndUpdate(id, data) {
+    return db.updateById(TABLE, id, data);
+  },
+  async findOneAndUpdate(filter, data) {
+    return db.updateOne(TABLE, filter, data);
+  },
+  async updateOne(filter, data) {
+    return db.updateOne(TABLE, filter, data);
+  },
+  async countDocuments(filter) {
+    return db.count(TABLE, filter);
+  },
+  async distinct(field, filter) {
+    return db.distinct(TABLE, field, filter);
+  },
+  async removeById(id) {
+    return db.removeById(TABLE, id);
+  },
+};

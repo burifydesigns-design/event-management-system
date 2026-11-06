@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const mongoSanitize = require('express-mongo-sanitize');
 
 const authRoutes = require('./routes/authRoutes');
 const eventRoutes = require('./routes/eventRoutes');
@@ -15,12 +14,11 @@ const orderRoutes = require('./routes/orderRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const coordinatorRoutes = require('./routes/coordinatorRoutes');
+const { supabase } = require('./config/supabase');
 const errorHandler = require('./middleware/errorHandler');
-const connectDB = require('./config/db');
-const mongoose = require('mongoose');
 
 function validateEnv() {
-  const required = ['MONGO_URI', 'JWT_SECRET'];
+  const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'JWT_SECRET'];
   const missing = required.filter((key) => !process.env[key]);
   if (missing.length > 0) {
     console.error(`Missing required environment variables: ${missing.join(', ')}`);
@@ -28,7 +26,6 @@ function validateEnv() {
   }
 }
 
-connectDB();
 validateEnv();
 
 const app = express();
@@ -62,7 +59,6 @@ app.use(
 
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
-app.use(mongoSanitize());
 
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -82,7 +78,6 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth', authLimiter);
 
-// Stricter rate limit for sensitive check-in / ticket issuance / email resend endpoints.
 const sensitiveLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: 60,
@@ -110,8 +105,8 @@ app.use('/api/coordinator', coordinatorRoutes);
 app.get('/api/health', async (_req, res) => {
   let dbStatus = 'unknown';
   try {
-    const state = mongoose.connection.readyState;
-    dbStatus = state === 1 ? 'connected' : 'disconnected';
+    const { error } = await supabase.from('users').select('id', { head: true, count: 'exact' });
+    dbStatus = error ? 'error' : 'connected';
   } catch (_err) {
     dbStatus = 'error';
   }

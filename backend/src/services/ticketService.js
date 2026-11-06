@@ -3,6 +3,7 @@ const Registration = require('../models/Registration');
 const TicketInstance = require('../models/TicketInstance');
 const TicketEmailLog = require('../models/TicketEmailLog');
 const CheckInLog = require('../models/CheckInLog');
+const Order = require('../models/Order');
 const { generateQRImage } = require('./qrService');
 const { sendTicketEmail } = require('./emailService');
 
@@ -22,14 +23,12 @@ function generateTicketToken() {
  * Paid tickets require a confirmed (paid) order before issuance.
  */
 async function issueTicket({ userId, eventId, ticketTypeId, orderId }) {
-  const existing = await Registration.findOne({ user: userId, event: eventId });
+  const existing = await Registration.findOne({ filter: { user: userId, event: eventId } });
   if (existing) {
     return { ticket: existing, created: false };
   }
 
-  // For paid orders, verify payment is confirmed before issuing.
   if (orderId) {
-    const Order = require('../models/Order');
     const order = await Order.findById(orderId);
     if (!order) {
       throw new Error('Order not found');
@@ -58,7 +57,6 @@ async function issueTicket({ userId, eventId, ticketTypeId, orderId }) {
     status: 'confirmed',
   });
 
-  // Link TicketInstance to Registration if one exists for this order.
   if (orderId) {
     await TicketInstance.updateMany(
       { order: orderId, attendee: userId },
@@ -66,7 +64,6 @@ async function issueTicket({ userId, eventId, ticketTypeId, orderId }) {
     );
   }
 
-  // Queue the ticket email (non-blocking). Delivery status tracked in TicketEmailLog.
   const emailLog = await TicketEmailLog.create({
     registration: registration._id,
     status: 'pending',
@@ -91,7 +88,7 @@ async function atomicCheckIn({ qrToken, eventId, staffUserId, staffRole }) {
     return { result: 'invalid', registration: null };
   }
 
-  const registration = await Registration.findOne({ qrToken }).populate('event');
+  const registration = await Registration.findOne({ filter: { qrToken }, populate: 'event' });
   if (!registration) {
     return { result: 'invalid', registration: null };
   }
@@ -101,7 +98,6 @@ async function atomicCheckIn({ qrToken, eventId, staffUserId, staffRole }) {
     return { result: 'invalid', registration: null };
   }
 
-  // Wrong event: ticket belongs to a different event.
   if (String(event._id) !== String(eventId)) {
     await logCheckIn({
       registration: registration._id,
@@ -115,7 +111,6 @@ async function atomicCheckIn({ qrToken, eventId, staffUserId, staffRole }) {
     return { result: 'wrong_event', registration };
   }
 
-  // Cancelled / refunded ticket.
   if (registration.status === 'cancelled' || registration.status === 'refunded') {
     await logCheckIn({
       registration: registration._id,
@@ -129,7 +124,6 @@ async function atomicCheckIn({ qrToken, eventId, staffUserId, staffRole }) {
     return { result: 'cancelled', registration };
   }
 
-  // Not confirmed (should not happen for issued tickets, but guard anyway).
   if (registration.status !== 'confirmed') {
     await logCheckIn({
       registration: registration._id,
@@ -143,7 +137,6 @@ async function atomicCheckIn({ qrToken, eventId, staffUserId, staffRole }) {
     return { result: 'invalid', registration };
   }
 
-  // Atomic single-document update: only succeeds if not already checked in.
   const updated = await Registration.findOneAndUpdate(
     { _id: registration._id, status: 'confirmed', checkedIn: false },
     {
@@ -152,12 +145,10 @@ async function atomicCheckIn({ qrToken, eventId, staffUserId, staffRole }) {
         checkedInAt: new Date(),
         checkedInBy: staffUserId,
       },
-    },
-    { new: true }
+    }
   );
 
   if (!updated) {
-    // Another scanner already checked this ticket in.
     await logCheckIn({
       registration: registration._id,
       event: event._id,
@@ -195,7 +186,6 @@ async function logCheckIn({ registration, event, ticketNumber, qrToken, scannedB
       result,
     });
   } catch (err) {
-    // Audit log failure must not fail the check-in response.
     console.error('Failed to write check-in audit log:', err.message);
   }
 }

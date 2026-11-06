@@ -1,5 +1,4 @@
-const Event = require('../models/Event');
-const mongoose = require('mongoose');
+const { isValidUuid } = require('../config/supabase');
 
 function requireEventAccess() {
   return async (req, res, next) => {
@@ -8,9 +7,10 @@ function requireEventAccess() {
       if (!eventId) {
         return res.status(400).json({ message: 'Event ID required' });
       }
-      if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      if (!isValidUuid(eventId)) {
         return res.status(400).json({ message: 'Invalid event ID' });
       }
+      const Event = require('../models/Event');
       const event = await Event.findById(eventId);
       if (!event) {
         return res.status(404).json({ message: 'Event not found' });

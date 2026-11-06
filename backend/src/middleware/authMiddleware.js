@@ -20,7 +20,7 @@ async function authMiddleware(req, res, next) {
       return res.status(401).json({ message: 'Invalid or expired token' });
     }
     // Ensure user still exists and not disabled (if field exists)
-    const user = await User.findById(decoded.userId).select('role status');
+    const user = await User.findById(decoded.userId);
     if (!user) {
       return res.status(401).json({ message: 'Invalid or expired token' });
     }

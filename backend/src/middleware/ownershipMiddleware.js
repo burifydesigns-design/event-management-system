@@ -1,8 +1,5 @@
-﻿const Event = require('../models/Event');
-const Registration = require('../models/Registration');
-const mongoose = require('mongoose');
+﻿const { isValidUuid } = require('../config/supabase');
 
-// Ensure the authenticated user owns the event or is admin
 function requireEventOwnershipOrAdmin() {
   return async (req, res, next) => {
     try {
@@ -10,9 +7,10 @@ function requireEventOwnershipOrAdmin() {
       if (!eventId) {
         return res.status(400).json({ message: 'Event ID required' });
       }
-      if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      if (!isValidUuid(eventId)) {
         return res.status(400).json({ message: 'Invalid event ID' });
       }
+      const Event = require('../models/Event');
       const event = await Event.findById(eventId);
       if (!event) {
         return res.status(404).json({ message: 'Event not found' });
@@ -31,7 +29,6 @@ function requireEventOwnershipOrAdmin() {
   };
 }
 
-// Ensure the authenticated user owns the registration or is admin
 function requireRegistrationOwnershipOrAdmin() {
   return async (req, res, next) => {
     try {
@@ -39,9 +36,10 @@ function requireRegistrationOwnershipOrAdmin() {
       if (!regId) {
         return res.status(400).json({ message: 'Registration ID required' });
       }
-      if (!mongoose.Types.ObjectId.isValid(regId)) {
+      if (!isValidUuid(regId)) {
         return res.status(400).json({ message: 'Invalid registration ID' });
       }
+      const Registration = require('../models/Registration');
       const registration = await Registration.findById(regId);
       if (!registration) {
         return res.status(404).json({ message: 'Registration not found' });

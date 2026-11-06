@@ -1,9 +1,9 @@
-const mongoose = require('mongoose');
 const Registration = require('../models/Registration');
 const Event = require('../models/Event');
 const TicketInstance = require('../models/TicketInstance');
 const { issueTicket, atomicCheckIn, generateTicketToken } = require('../services/ticketService');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
+const { isValidUuid } = require('../config/supabase');
 
 /**
  * Check if the authenticated user is staff for the given event.
@@ -13,7 +13,6 @@ async function isStaffForEvent(user, event) {
   if (!user || !event) return false;
   if (user.role === 'admin') return true;
   if (String(event.organizer) === String(user.userId || user._id)) return true;
-  // Coordinator must be assigned to this event.
   if (user.role === 'coordinator') {
     const CoordinatorAssignment = require('../models/CoordinatorAssignment');
     const assignment = await CoordinatorAssignment.findOne({
@@ -25,28 +24,22 @@ async function isStaffForEvent(user, event) {
   return false;
 }
 
-/**
- * POST /api/tickets/issue — Issue a ticket for an attendee to an event.
- * Organizer/admin only. Idempotent. Payment-gated for paid orders.
- */
 exports.issueTicket = async (req, res, next) => {
   try {
     const { userId, eventId, ticketTypeId, orderId } = req.body;
 
-    if (!userId || !eventId || !mongoose.Types.ObjectId.isValid(eventId)) {
+    if (!userId || !eventId || !isValidUuid(eventId)) {
       return res.status(400).json({ message: 'userId and valid eventId are required' });
     }
 
     const event = await Event.findById(eventId);
     if (!event) return res.status(404).json({ message: 'Event not found' });
 
-    // Authorization: organizer of event or admin.
     const isStaff = await isStaffForEvent(req.user, event);
     if (!isStaff) {
       return res.status(403).json({ message: 'Not authorized to issue tickets for this event' });
     }
 
-    // Cannot issue for cancelled events.
     if (event.status === 'cancelled') {
       return res.status(400).json({ message: 'Cannot issue tickets for a cancelled event' });
     }
@@ -80,19 +73,19 @@ exports.issueTicket = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/tickets/:id — Retrieve a ticket (registration) when authorized.
- */
 exports.getTicket = async (req, res, next) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    if (!isValidUuid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid ticket ID' });
     }
 
-    const registration = await Registration.findById(req.params.id)
-      .populate('event', 'title date time location city status capacity organizer')
-      .populate('user', 'name email role')
-      .populate('ticketType', 'name price');
+    const registration = await Registration.findById(req.params.id, {
+      populate: [
+        { path: 'event', fields: 'title date time location city status capacity organizer' },
+        { path: 'user', fields: 'name email role' },
+        { path: 'ticketType', fields: 'name price' },
+      ],
+    });
 
     if (!registration) {
       return res.status(404).json({ message: 'Ticket not found' });
@@ -143,16 +136,13 @@ exports.getTicket = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/tickets/:id/qr — QR image for an authorized ticket.
- */
 exports.getTicketQR = async (req, res, next) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    if (!isValidUuid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid ticket ID' });
     }
 
-    const registration = await Registration.findById(req.params.id).populate('event');
+    const registration = await Registration.findById(req.params.id, { populate: 'event' });
     if (!registration) {
       return res.status(404).json({ message: 'Ticket not found' });
     }
@@ -176,18 +166,17 @@ exports.getTicketQR = async (req, res, next) => {
   }
 };
 
-/**
- * POST /api/tickets/validate — Pre-check a ticket before check-in (scanner).
- * Returns outcome without mutating state.
- */
 exports.validateTicket = async (req, res, next) => {
   try {
     const { qrToken, eventId } = req.body;
-    if (!qrToken || !eventId || !mongoose.Types.ObjectId.isValid(eventId)) {
+    if (!qrToken || !eventId || !isValidUuid(eventId)) {
       return res.status(400).json({ valid: false, message: 'Valid QR token and event ID are required' });
     }
 
-    const registration = await Registration.findOne({ qrToken }).populate('event');
+    const registration = await Registration.findOne({
+      filter: { qrToken },
+      populate: 'event',
+    });
     if (!registration) {
       return res.status(404).json({ valid: false, message: 'Ticket not found' });
     }
@@ -238,14 +227,10 @@ exports.validateTicket = async (req, res, next) => {
   }
 };
 
-/**
- * POST /api/tickets/check-in — Atomically check in a ticket (scanner).
- * Concurrency-safe: findOneAndUpdate with checkedIn:false prevents double admission.
- */
 exports.checkInTicket = async (req, res, next) => {
   try {
     const { qrToken, eventId } = req.body;
-    if (!qrToken || !eventId || !mongoose.Types.ObjectId.isValid(eventId)) {
+    if (!qrToken || !eventId || !isValidUuid(eventId)) {
       return res.status(400).json({ message: 'Valid QR token and event ID are required' });
     }
 
@@ -283,16 +268,13 @@ exports.checkInTicket = async (req, res, next) => {
   }
 };
 
-/**
- * POST /api/tickets/:id/resend-email — Resend ticket email (owner or staff).
- */
 exports.resendTicketEmail = async (req, res, next) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    if (!isValidUuid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid ticket ID' });
     }
 
-    const registration = await Registration.findById(req.params.id).populate('user event');
+    const registration = await Registration.findById(req.params.id, { populate: ['user', 'event'] });
     if (!registration) {
       return res.status(404).json({ message: 'Ticket not found' });
     }
@@ -314,21 +296,22 @@ exports.resendTicketEmail = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/tickets/my — List the authenticated user's tickets.
- */
 exports.myTickets = async (req, res, next) => {
   try {
     const pg = parsePagination(req.query, { defaultLimit: 20 });
     if (pg.error) return res.status(400).json({ message: pg.error });
 
     const totalItems = await Registration.countDocuments({ user: req.user.userId });
-    const tickets = await Registration.find({ user: req.user.userId })
-      .populate('event', 'title date time location city status')
-      .populate('ticketType', 'name price')
-      .sort({ registeredAt: -1, _id: -1 })
-      .skip(pg.skip)
-      .limit(pg.limit);
+    const { rows: tickets } = await Registration.find({
+      filter: { user: req.user.userId },
+      populate: [
+        { path: 'event', fields: 'title date time location city status' },
+        { path: 'ticketType', fields: 'name price' },
+      ],
+      sort: { registeredAt: -1, _id: -1 },
+      skip: pg.skip,
+      limit: pg.limit,
+    });
 
     res.json({
       data: tickets,

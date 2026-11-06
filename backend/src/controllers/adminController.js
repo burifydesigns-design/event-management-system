@@ -2,23 +2,21 @@ const User = require('../models/User');
 const Event = require('../models/Event');
 const Registration = require('../models/Registration');
 const { generateAttendeesCSV } = require('../utils/csvExport');
+const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
+const { isValidUuid } = require('../config/supabase');
 
 exports.getDashboard = async (req, res, next) => {
   try {
     const totalUsers = await User.countDocuments();
     const totalEvents = await Event.countDocuments();
     const totalRegistrations = await Registration.countDocuments();
-    const upcomingEvents = await Event.countDocuments({ status: 'published', date: { $gte: new Date() } });
+    const upcomingEvents = await Event.countDocuments({
+      status: 'published',
+      date: { $gte: new Date() },
+    });
 
-    const capacityResult = await Event.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalCapacity: { $sum: '$capacity' },
-        },
-      },
-    ]);
-    const availableSeats = capacityResult.length > 0 ? capacityResult[0].totalCapacity : 0;
+    const { rows: allEvents } = await Event.find({ select: 'capacity' });
+    const availableSeats = allEvents.reduce((sum, e) => sum + (e.capacity || 0), 0);
 
     const checkedInAttendees = await Registration.countDocuments({ checkedIn: true });
 
@@ -39,20 +37,34 @@ exports.getEventAttendees = async (req, res, next) => {
   try {
     const { eventId } = req.params;
 
-    if (req.user.role === 'organizer') {
-      const event = await Event.findById(eventId).select('_id organizer');
-      if (!event) {
-        return res.status(404).json({ message: 'Event not found' });
-      }
-      if (String(event.organizer) !== String(req.user.userId)) {
-        return res.status(403).json({ message: 'Not authorized to view this event' });
-      }
+    if (!eventId || !isValidUuid(eventId)) {
+      return res.status(400).json({ message: 'Invalid event ID' });
     }
 
-    const attendees = await Registration.find({ event: eventId })
-      .populate('user', 'name email')
-      .sort({ registeredAt: -1 });
-    res.json(attendees);
+    const event = await Event.findById(eventId, { select: '_id organizer' });
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    if (req.user.role === 'organizer' && String(event.organizer) !== String(req.user.userId)) {
+      return res.status(403).json({ message: 'Not authorized to view this event' });
+    }
+
+    const { page, limit, skip, error } = parsePagination(req.query);
+    if (error) return res.status(400).json({ message: error });
+
+    const totalItems = await Registration.countDocuments({ event: eventId });
+    const { rows: attendees } = await Registration.find({
+      filter: { event: eventId },
+      populate: [{ path: 'user', fields: 'name email' }],
+      sort: { registeredAt: -1 },
+      skip,
+      limit,
+    });
+
+    res.json({
+      data: attendees,
+      pagination: buildPaginationMeta({ page, limit, totalItems }),
+    });
   } catch (err) {
     next(err);
   }
@@ -62,7 +74,7 @@ exports.exportEventAttendees = async (req, res, next) => {
   try {
     const { eventId } = req.params;
 
-    if (!eventId || !require('mongoose').Types.ObjectId.isValid(eventId)) {
+    if (!eventId || !isValidUuid(eventId)) {
       return res.status(400).json({ message: 'Invalid event ID' });
     }
 
@@ -71,15 +83,18 @@ exports.exportEventAttendees = async (req, res, next) => {
       return res.status(404).json({ message: 'Event not found' });
     }
 
-    // Role-based scope: organizers may only export events they organize.
     if (req.user.role === 'organizer' && String(event.organizer) !== String(req.user.userId)) {
       return res.status(403).json({ message: 'Not authorized to export this event' });
     }
 
-    const registrations = await Registration.find({ event: eventId })
-      .populate('user', 'name email')
-      .populate('event', 'title')
-      .sort({ registeredAt: -1 });
+    const { rows: registrations } = await Registration.find({
+      filter: { event: eventId },
+      populate: [
+        { path: 'user', fields: 'name email' },
+        { path: 'event', fields: 'title' },
+      ],
+      sort: { registeredAt: -1 },
+    });
 
     const csv = generateAttendeesCSV(registrations);
 
@@ -120,10 +135,9 @@ exports.getAnalytics = async (req, res, next) => {
     const registrationMatch = {};
     if (rangeMatch) registrationMatch.registeredAt = rangeMatch;
 
-    // Organizers see only their own events; admins see platform-wide data.
     let organizerEventIds = null;
     if (req.user.role === 'organizer') {
-      organizerEventIds = await Event.find({ organizer: req.user.userId }).distinct('_id');
+      organizerEventIds = await Event.distinct('_id', { organizer: req.user.userId });
       if (organizerEventIds.length === 0) {
         return res.json({
           registrationsOverTime: [],
@@ -137,102 +151,54 @@ exports.getAnalytics = async (req, res, next) => {
       registrationMatch.event = { $in: organizerEventIds };
     }
 
-    // Registrations over time: grouped by registration timestamp (not event date).
-    const registrationsOverTime = await Registration.aggregate([
-      { $match: registrationMatch },
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$registeredAt' } },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
-    // Registrations per event: confirmed registrations only, with event name.
-    const registrationsPerEvent = await Registration.aggregate([
-      { $match: { ...registrationMatch, status: 'confirmed' } },
-      {
-        $group: {
-          _id: '$event',
-          count: { $sum: 1 },
-        },
-      },
-      {
-        $lookup: {
-          from: 'events',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'event',
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          eventId: '$_id',
-          eventName: { $arrayElemAt: ['$event.title', 0] },
-          count: 1,
-        },
-      },
-      { $sort: { count: -1 } },
-    ]);
-
-    const totalConfirmed = await Registration.countDocuments({
-      ...registrationMatch,
-      status: 'confirmed',
+    const { rows: registrations } = await Registration.find({
+      filter: registrationMatch,
+      select: 'registered_at event status checked_in',
     });
-    const totalCheckedIn = await Registration.countDocuments({
-      ...registrationMatch,
-      status: 'confirmed',
-      checkedIn: true,
-    });
+
+    const overTimeMap = {};
+    for (const r of registrations) {
+      const day = new Date(r.registeredAt).toISOString().slice(0, 10);
+      overTimeMap[day] = (overTimeMap[day] || 0) + 1;
+    }
+    const registrationsOverTime = Object.entries(overTimeMap)
+      .map(([_id, count]) => ({ _id, count }))
+      .sort((a, b) => a._id.localeCompare(b._id));
+
+    const confirmedRegs = registrations.filter((r) => r.status === 'confirmed');
+    const perEventMap = {};
+    for (const r of confirmedRegs) {
+      perEventMap[r.event] = (perEventMap[r.event] || 0) + 1;
+    }
+    const eventIds = Object.keys(perEventMap);
+    const events = eventIds.length
+      ? (await Event.find({ filter: { _id: { $in: eventIds } }, select: '_id title' })).rows
+      : [];
+    const eventMap = {};
+    for (const e of events) eventMap[e._id] = e.title;
+    const registrationsPerEvent = Object.entries(perEventMap)
+      .map(([eventId, count]) => ({ _id: eventId, eventName: eventMap[eventId] || '', count }))
+      .sort((a, b) => b.count - a.count);
+
+    const totalConfirmed = confirmedRegs.length;
+    const totalCheckedIn = confirmedRegs.filter((r) => r.checkedIn === true).length;
     const checkInRate = totalConfirmed > 0 ? (totalCheckedIn / totalConfirmed) * 100 : 0;
 
-    // Capacity utilization: confirmed registrations only (cancelled excluded).
-    const capacityUtilization = await Event.aggregate([
-      organizerEventIds ? { $match: { _id: { $in: organizerEventIds } } } : { $match: {} },
-      {
-        $lookup: {
-          from: 'registrations',
-          let: { eventId: '$_id' },
-          pipeline: [
-            {
-              $match: {
-                $expr: { $eq: ['$event', '$$eventId'] },
-                status: 'confirmed',
-                ...(rangeMatch ? { registeredAt: rangeMatch } : {}),
-              },
-            },
-            { $count: 'count' },
-          ],
-          as: 'regCount',
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          eventId: '$_id',
-          eventName: '$title',
-          capacity: 1,
-          registered: {
-            $ifNull: [{ $arrayElemAt: ['$regCount.count', 0] }, 0],
-          },
-          utilization: {
-            $cond: [
-              { $eq: ['$capacity', 0] },
-              0,
-              {
-                $multiply: [
-                  { $divide: [{ $ifNull: [{ $arrayElemAt: ['$regCount.count', 0] }, 0] }, '$capacity'] },
-                  100,
-                ],
-              },
-            ],
-          },
-        },
-      },
-      { $sort: { utilization: -1 } },
-    ]);
+    const { rows: capacityEvents } = await Event.find({
+      filter: organizerEventIds ? { _id: { $in: organizerEventIds } } : {},
+      select: '_id title capacity',
+    });
+    const regCountByEvent = {};
+    const capacityRegFilter = { status: 'confirmed', ...(rangeMatch ? { registeredAt: rangeMatch } : {}) };
+    const { rows: capacityRegs } = await Registration.find({ filter: capacityRegFilter, select: 'event' });
+    for (const r of capacityRegs) {
+      regCountByEvent[r.event] = (regCountByEvent[r.event] || 0) + 1;
+    }
+    const capacityUtilization = capacityEvents.map((e) => {
+      const registered = regCountByEvent[e._id] || 0;
+      const utilization = e.capacity === 0 ? 0 : (registered / e.capacity) * 100;
+      return { _id: e._id, eventName: e.title, capacity: e.capacity, registered, utilization };
+    }).sort((a, b) => b.utilization - a.utilization);
 
     res.json({
       registrationsOverTime,

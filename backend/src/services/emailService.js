@@ -136,12 +136,14 @@ async function sendTicketEmail(registration, emailLogId) {
     return;
   }
 
+  let attempts = emailLog.attempts || 0;
+
   const send = async () => {
-    emailLog.attempts += 1;
-    emailLog.lastAttemptAt = new Date();
+    attempts += 1;
+    const now = new Date();
 
     try {
-      const event = registration.event || await Registration.findById(registration._id).populate('event');
+      const event = registration.event || await Registration.findById(registration._id, { populate: 'event' });
       const eventDoc = registration.event || event.event;
 
       const attendee = {
@@ -177,27 +179,35 @@ async function sendTicketEmail(registration, emailLogId) {
         html,
       });
 
-      emailLog.status = 'sent';
-      emailLog.sentAt = new Date();
-      emailLog.error = null;
-      await emailLog.save();
+      await TicketEmailLog.findByIdAndUpdate(emailLogId, {
+        $set: {
+          status: 'sent',
+          sentAt: now,
+          error: null,
+          attempts,
+          lastAttemptAt: now,
+        },
+      });
 
       await Registration.findByIdAndUpdate(registration._id, {
-        $set: { emailSent: true, emailSentAt: new Date() },
+        $set: { emailSent: true, emailSentAt: now },
       });
 
       return { success: true };
     } catch (err) {
-      emailLog.error = err.message;
-      if (emailLog.attempts < MAX_EMAIL_ATTEMPTS) {
-        await emailLog.save();
+      const error = err.message;
+      if (attempts < MAX_EMAIL_ATTEMPTS) {
+        await TicketEmailLog.findByIdAndUpdate(emailLogId, {
+          $set: { error, attempts, lastAttemptAt: now },
+        });
         await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
         return send();
       }
-      emailLog.status = 'failed';
-      await emailLog.save();
-      console.error('Ticket email failed after retries:', err.message);
-      return { success: false, error: err.message };
+      await TicketEmailLog.findByIdAndUpdate(emailLogId, {
+        $set: { status: 'failed', error, attempts, lastAttemptAt: now },
+      });
+      console.error('Ticket email failed after retries:', error);
+      return { success: false, error };
     }
   };
 
@@ -208,12 +218,10 @@ async function sendTicketEmail(registration, emailLogId) {
  * Resend a ticket email. Creates a new delivery attempt if previous failed.
  */
 async function resendTicketEmail(registrationId) {
-  const registration = await Registration.findById(registrationId).populate('user event');
+  const registration = await Registration.findById(registrationId, { populate: ['user', 'event'] });
   if (!registration) {
     throw new Error('Registration not found');
   }
-
-  const existingLog = await TicketEmailLog.findOne({ registration: registrationId }).sort({ createdAt: -1 });
 
   const emailLog = await TicketEmailLog.create({
     registration: registrationId,

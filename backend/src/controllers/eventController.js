@@ -1,5 +1,5 @@
 const Event = require('../models/Event');
-const mongoose = require('mongoose');
+const { isValidUuid } = require('../config/supabase');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 
 const today = () => {
@@ -31,19 +31,16 @@ exports.listEvents = async (req, res, next) => {
     if (price === 'paid') query.price = { $gt: 0 };
 
     const totalEvents = await Event.countDocuments(query);
-    // Deterministic sort with a unique tie-breaker (_id) so records are not
-    // duplicated or skipped across page boundaries.
-    const events = await Event.find(query)
-      .populate('organizer', 'name email')
-      .sort({ date: 1, _id: 1 })
-      .skip(skip)
-      .limit(limit);
+    const { rows: events } = await Event.find({
+      filter: query,
+      populate: 'organizer',
+      sort: { date: 1, _id: 1 },
+      skip,
+      limit,
+    });
 
     const pagination = buildPaginationMeta({ page, limit, totalItems: totalEvents });
 
-    // Legacy fields (page, limit, totalEvents, totalPages) are kept for
-    // backward compatibility with existing consumers; new consumers should
-    // use the `pagination` object.
     res.json({ events, page, limit, totalEvents, totalPages: pagination.totalPages, pagination });
   } catch (err) {
     next(err);
@@ -52,10 +49,10 @@ exports.listEvents = async (req, res, next) => {
 
 exports.getEvent = async (req, res, next) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    if (!isValidUuid(req.params.id)) {
       return res.status(400).json({ message: 'Invalid event ID' });
     }
-    const event = await Event.findById(req.params.id).populate('organizer', 'name email');
+    const event = await Event.findById(req.params.id, { populate: 'organizer' });
     if (!event) return res.status(404).json({ message: 'Event not found' });
     res.json(event);
   } catch (err) {
@@ -79,7 +76,10 @@ exports.updateEvent = async (req, res, next) => {
     if (String(event.organizer) !== String(req.user.userId) && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not your event' });
     }
-    const updateData = { ...req.body }; delete updateData.organizer; delete updateData._id; const updated = await Event.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    const updateData = { ...req.body };
+    delete updateData.organizer;
+    delete updateData._id;
+    const updated = await Event.findByIdAndUpdate(req.params.id, updateData);
     res.json(updated);
   } catch (err) {
     next(err);
@@ -93,7 +93,7 @@ exports.deleteEvent = async (req, res, next) => {
     if (String(event.organizer) !== String(req.user.userId) && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not your event' });
     }
-    await event.deleteOne();
+    await Event.removeById(event.id);
     res.json({ message: 'Event deleted' });
   } catch (err) {
     next(err);
@@ -108,8 +108,8 @@ exports.publishEvent = async (req, res, next) => {
       return res.status(403).json({ message: 'Not your event' });
     }
     event.status = event.status === 'published' ? 'draft' : 'published';
-    await event.save();
-    res.json(event);
+    const updated = await Event.findByIdAndUpdate(event.id, { status: event.status });
+    res.json(updated || event);
   } catch (err) {
     next(err);
   }

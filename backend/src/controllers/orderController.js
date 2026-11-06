@@ -1,10 +1,10 @@
 const Order = require('../models/Order');
 const TicketType = require('../models/TicketType');
 const TicketInstance = require('../models/TicketInstance');
+const Event = require('../models/Event');
 const { issueTicket } = require('../services/ticketService');
+const { isValidUuid } = require('../config/supabase');
 
-// Attendee creates an order for ticket(s). Order starts as pending; tickets are
-// issued only after payment is confirmed.
 exports.createOrder = async (req, res, next) => {
   try {
     const { eventId, ticketTypeId, quantity } = req.body;
@@ -36,7 +36,7 @@ exports.createOrder = async (req, res, next) => {
     }
 
     ticketType.quantitySold += Number(quantity);
-    await ticketType.save();
+    await TicketType.findByIdAndUpdate(ticketType.id, { quantitySold: ticketType.quantitySold });
 
     res.status(201).json({ order, tickets });
   } catch (err) {
@@ -44,33 +44,29 @@ exports.createOrder = async (req, res, next) => {
   }
 };
 
-// Attendee: list their own tickets (TicketInstances).
 exports.myTickets = async (req, res, next) => {
   try {
-    const tickets = await TicketInstance.find({ attendee: req.user.userId })
-      .populate('event ticketType')
-      .sort({ createdAt: -1 });
+    const { rows: tickets } = await TicketInstance.find({
+      filter: { attendee: req.user.userId },
+      populate: ['event', 'ticketType'],
+      sort: { createdAt: -1 },
+    });
     res.json(tickets);
   } catch (err) {
     next(err);
   }
 };
 
-// Organizer/admin: confirm payment for an order and issue tickets.
-// In production this would be triggered by a verified payment webhook.
 exports.confirmPayment = async (req, res, next) => {
   try {
     const { orderId } = req.body;
-    if (!orderId || !require('mongoose').Types.ObjectId.isValid(orderId)) {
+    if (!orderId || !isValidUuid(orderId)) {
       return res.status(400).json({ message: 'Valid order ID is required' });
     }
 
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    // Authorization: admin, or the order owner (attendee confirming their own),
-    // or organizer of the event.
-    const Event = require('../models/Event');
     const event = await Event.findById(order.event);
     const isOwner = String(order.attendee) === String(req.user.userId);
     const isAdmin = req.user.role === 'admin';
@@ -83,12 +79,10 @@ exports.confirmPayment = async (req, res, next) => {
       return res.status(409).json({ message: 'Order already paid' });
     }
 
-    order.status = 'paid';
-    await order.save();
+    await Order.findByIdAndUpdate(order.id, { status: 'paid' });
 
-    // Issue a Registration ticket for each TicketInstance in this order.
     const issued = [];
-    const ticketInstances = await TicketInstance.find({ order: order._id });
+    const { rows: ticketInstances } = await TicketInstance.find({ filter: { order: order._id } });
     for (const ti of ticketInstances) {
       try {
         const result = await issueTicket({
@@ -103,7 +97,7 @@ exports.confirmPayment = async (req, res, next) => {
       }
     }
 
-    res.json({ message: 'Payment confirmed and tickets issued', order, issued });
+    res.json({ message: 'Payment confirmed and tickets issued', order: { ...order, status: 'paid' }, issued });
   } catch (err) {
     next(err);
   }

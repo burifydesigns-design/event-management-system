@@ -1,34 +1,24 @@
-const mongoose = require('mongoose');
-const Registration = require('../models/Registration');
 const Event = require('../models/Event');
+const Registration = require('../models/Registration');
 const CoordinatorAssignment = require('../models/CoordinatorAssignment');
 const { atomicCheckIn } = require('../services/ticketService');
+const { isValidUuid } = require('../config/supabase');
 
-/**
- * Check if the user can scan for the given event.
- * Admin: any event. Organizer: their own events. Coordinator: assigned events only.
- */
 async function canScanEvent(user, eventId) {
-  if (!mongoose.Types.ObjectId.isValid(eventId)) return false;
+  if (!isValidUuid(eventId)) return false;
   const event = await Event.findById(eventId);
   if (!event) return false;
   if (user.role === 'admin') return true;
   if (String(event.organizer) === String(user.userId || user._id)) return true;
   if (user.role === 'coordinator') {
     const assignment = await CoordinatorAssignment.findOne({
-      coordinator: user.userId || user._id,
-      event: eventId,
+      filter: { coordinator: user.userId || user._id, event: eventId },
     });
     return !!assignment;
   }
   return false;
 }
 
-/**
- * POST /api/scan — Scan a ticket QR code at the venue.
- * Body: { qrToken, eventId }
- * Coordinator can only scan tickets for assigned events.
- */
 exports.scanTicket = async (req, res, next) => {
   try {
     const { qrToken, eventId } = req.body;
@@ -76,10 +66,6 @@ exports.scanTicket = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/scan/events — List events the authenticated user is authorized to scan.
- * Admin: all published events. Organizer: their own events. Coordinator: assigned events.
- */
 exports.scanEvents = async (req, res, next) => {
   try {
     let query = {};
@@ -88,8 +74,9 @@ exports.scanEvents = async (req, res, next) => {
         query.organizer = req.user.userId;
       } else if (req.user.role === 'coordinator') {
         const assignments = await CoordinatorAssignment.find({
-          coordinator: req.user.userId,
-        }).select('event');
+          filter: { coordinator: req.user.userId },
+          select: 'event',
+        });
         const eventIds = assignments.map((a) => a.event);
         if (eventIds.length === 0) {
           return res.json({ data: [], pagination: { page: 1, limit: 50, totalItems: 0, totalPages: 0, hasNextPage: false, hasPreviousPage: false } });
@@ -102,24 +89,26 @@ exports.scanEvents = async (req, res, next) => {
 
     query.status = 'published';
 
-    const events = await Event.find(query)
-      .select('title date time location city capacity status organizer')
-      .sort({ date: 1, _id: 1 });
+    const { rows: events } = await Event.find({
+      filter: query,
+      select: 'title date time location city capacity status organizer',
+      sort: { date: 1, _id: 1 },
+    });
 
-    // Annotate each event with confirmed registration count and checked-in count.
     const eventIds = events.map((e) => e._id);
-    const counts = await Registration.aggregate([
-      { $match: { event: { $in: eventIds }, status: 'confirmed' } },
-      {
-        $group: {
-          _id: '$event',
-          confirmed: { $sum: 1 },
-          checkedIn: { $sum: { $cond: ['$checkedIn', 1, 0] } },
-        },
-      },
-    ]);
-    const countMap = {};
-    counts.forEach((c) => { countMap[String(c._id)] = c; });
+    let countMap = {};
+    if (eventIds.length > 0) {
+    const { rows: regs } = await Registration.find({
+      filter: { event: { $in: eventIds }, status: 'confirmed' },
+      select: 'event checked_in',
+    });
+      countMap = {};
+      for (const r of regs) {
+        if (!countMap[r.event]) countMap[r.event] = { confirmed: 0, checkedIn: 0 };
+        countMap[r.event].confirmed += 1;
+        if (r.checkedIn === true) countMap[r.event].checkedIn += 1;
+      }
+    }
 
     const data = events.map((e) => {
       const c = countMap[String(e._id)] || { confirmed: 0, checkedIn: 0 };
@@ -143,10 +132,6 @@ exports.scanEvents = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/scan/history — Check-in history for the authenticated user (staff).
- * Coordinator: their own scans. Organizer/Admin: all scans for their events.
- */
 exports.scanHistory = async (req, res, next) => {
   try {
     const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
@@ -159,18 +144,19 @@ exports.scanHistory = async (req, res, next) => {
     if (req.user.role === 'coordinator') {
       match.scannedBy = req.user.userId;
     } else if (req.user.role === 'organizer') {
-      const events = await Event.find({ organizer: req.user.userId }).select('_id');
+      const events = await Event.find({ filter: { organizer: req.user.userId }, select: '_id' });
       const eventIds = events.map((e) => e._id);
       match.event = { $in: eventIds };
     }
-    // Admin: no filter (all scans).
 
     const totalItems = await CheckInLog.countDocuments(match);
-    const logs = await CheckInLog.find(match)
-      .populate('scannedBy', 'name email role')
-      .sort({ scannedAt: -1, _id: -1 })
-      .skip(pg.skip)
-      .limit(pg.limit);
+    const { rows: logs } = await CheckInLog.find({
+      filter: match,
+      populate: [{ path: 'scannedBy', fields: 'name email role' }],
+      sort: { scannedAt: -1, _id: -1 },
+      skip: pg.skip,
+      limit: pg.limit,
+    });
 
     res.json({
       data: logs,

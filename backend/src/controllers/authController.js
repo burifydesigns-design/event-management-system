@@ -12,7 +12,7 @@ exports.register = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
     const normalizedEmail = email.toLowerCase().trim();
-    const existing = await User.findOne({ email: normalizedEmail });
+    const existing = await User.findOne({ filter: { email: normalizedEmail } });
     if (existing) {
       return res.status(409).json({ message: 'Email already in use' });
     }
@@ -34,7 +34,7 @@ exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
     const normalizedEmail = email.toLowerCase().trim();
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ filter: { email: normalizedEmail } });
     if (!user) {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
@@ -56,10 +56,11 @@ exports.login = async (req, res, next) => {
 
 exports.getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.userId).select('-password');
+    const user = await User.findById(req.user.userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+    delete user.password;
     res.json({ user });
   } catch (err) {
     next(err);
@@ -72,10 +73,11 @@ exports.updateProfile = async (req, res, next) => {
     const updates = {};
     if (name) updates.name = name;
 
-    const user = await User.findByIdAndUpdate(req.user.userId, updates, { new: true }).select('-password');
+    const user = await User.findByIdAndUpdate(req.user.userId, updates);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+    delete user.password;
     res.json({ user });
   } catch (err) {
     next(err);

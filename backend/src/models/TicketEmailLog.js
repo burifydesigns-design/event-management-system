@@ -1,26 +1,23 @@
-const mongoose = require('mongoose');
+const db = require('../lib/db');
+const TABLE = 'ticket_email_logs';
 
-const ticketEmailLogSchema = new mongoose.Schema(
-  {
-    registration: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Registration',
-      required: true,
-    },
-    status: {
-      type: String,
-      enum: ['pending', 'sent', 'failed'],
-      default: 'pending',
-    },
-    attempts: { type: Number, default: 0 },
-    lastAttemptAt: { type: Date, default: null },
-    sentAt: { type: Date, default: null },
-    error: { type: String, default: null },
+module.exports = {
+  async findOne(opts) {
+    return db.findOne(TABLE, opts);
   },
-  { timestamps: true }
-);
-
-ticketEmailLogSchema.index({ registration: 1 });
-ticketEmailLogSchema.index({ status: 1, lastAttemptAt: 1 });
-
-module.exports = mongoose.model('TicketEmailLog', ticketEmailLogSchema);
+  async findById(id, opts) {
+    return db.findById(TABLE, id, opts);
+  },
+  async find(opts) {
+    return db.find(TABLE, opts);
+  },
+  async create(data) {
+    return db.create(TABLE, data);
+  },
+  async findByIdAndUpdate(id, data) {
+    return db.updateById(TABLE, id, data);
+  },
+  async countDocuments(filter) {
+    return db.count(TABLE, filter);
+  },
+};

@@ -1,12 +1,10 @@
 const request = require('supertest');
-const mongoose = require('mongoose');
 const { setupTestApp, teardownTestApp, clearDatabase } = require('./helpers');
 
-let Event;
-let User;
+const Event = require('../src/models/Event');
+const User = require('../src/models/User');
 
 let app;
-let mongoServer;
 let organizerId;
 
 const daysFromNow = (n) => {
@@ -38,13 +36,11 @@ async function seedEvents(count, overrides = {}) {
 }
 
 beforeAll(async () => {
-  ({ app, mongoServer } = await setupTestApp());
-  Event = mongoose.model('Event');
-  User = mongoose.model('User');
+  ({ app } = await setupTestApp());
 });
 
 afterAll(async () => {
-  await teardownTestApp(mongoServer);
+  await teardownTestApp();
 });
 
 beforeEach(async () => {
