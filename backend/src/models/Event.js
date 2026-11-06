@@ -12,6 +12,10 @@ const eventSchema = new mongoose.Schema(
     capacity: { type: Number, required: true, min: 1 },
     price: { type: Number, default: 0, min: 0 },
     image: { type: String, default: "" },
+    // Per-event poster/ticket colors. colorA = main halftone color, colorB = halftone dot color.
+    // Organizer picks from a fixed preset when creating; defaults fall back to the first preset.
+    colorA: { type: String, default: "#c42a55" },
+    colorB: { type: String, default: "#ffb703" },
     organizer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     status: {
       type: String,

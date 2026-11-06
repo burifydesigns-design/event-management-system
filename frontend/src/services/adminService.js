@@ -46,3 +46,8 @@ export const deleteUser = async (userId) => {
   const { data } = await api.delete(`/admin/users/${userId}`)
   return data
 }
+
+export const createStaffUser = async ({ name, email, password, role }) => {
+  const { data } = await api.post('/users', { name, email, password, role })
+  return data
+}

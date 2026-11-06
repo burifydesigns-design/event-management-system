@@ -1,238 +1,155 @@
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import EventCard from '../components/EventCard'
-import '../styles/home.css'
+import { getEvents } from '../services/eventService'
+import TicketSheet from '../components/TicketSheet'
+import Loading from '../components/Loading'
+import ErrorMessage from '../components/ErrorMessage'
 
-const MOCK_EVENTS = [
-  {
-    _id: '1',
-    title: 'React & JavaScript Workshop',
-    category: 'Technology',
-    date: '2026-07-15',
-    city: 'Nairobi',
-    location: 'Nairobi, Kenya',
-    time: '10:00 AM',
-    price: 25,
-    capacity: 100,
-    registeredCount: 72,
-    image: 'https://via.placeholder.com/400x250/4f46e5/ffffff?text=React+Workshop',
-    description: 'Hands-on workshop covering modern React patterns and JavaScript best practices.',
-  },
-  {
-    _id: '2',
-    title: 'Business Growth Summit',
-    category: 'Business',
-    date: '2026-07-22',
-    city: 'Nairobi',
-    location: 'Nairobi, Kenya',
-    time: '9:00 AM',
-    price: 50,
-    capacity: 200,
-    registeredCount: 134,
-    image: 'https://via.placeholder.com/400x250/0ea5e9/ffffff?text=Business+Summit',
-    description: 'Network with industry leaders and learn strategies to scale your business.',
-  },
-  {
-    _id: '3',
-    title: 'Live Music Festival',
-    category: 'Music',
-    date: '2026-08-02',
-    city: 'Nairobi',
-    location: 'Nairobi, Kenya',
-    time: '4:00 PM',
-    price: 35,
-    capacity: 500,
-    registeredCount: 320,
-    image: 'https://via.placeholder.com/400x250/f59e0b/ffffff?text=Music+Festival',
-    description: 'An unforgettable evening of live performances from top local and international artists.',
-  },
-  {
-    _id: '4',
-    title: 'Startup Pitch Night',
-    category: 'Business',
-    date: '2026-08-10',
-    city: 'Nairobi',
-    location: 'Nairobi, Kenya',
-    time: '6:00 PM',
-    price: 0,
-    capacity: 150,
-    registeredCount: 98,
-    image: 'https://via.placeholder.com/400x250/10b981/ffffff?text=Startup+Pitch',
-    description: 'Watch innovative startups pitch their ideas to a panel of investors.',
-  },
-  {
-    _id: '5',
-    title: 'Design Systems Conference',
-    category: 'Technology',
-    date: '2026-08-18',
-    city: 'Nairobi',
-    location: 'Nairobi, Kenya',
-    time: '9:00 AM',
-    price: 40,
-    capacity: 250,
-    registeredCount: 180,
-    image: 'https://via.placeholder.com/400x250/8b5cf6/ffffff?text=Design+Systems',
-    description: 'Deep dive into building scalable design systems for modern products.',
-  },
-  {
-    _id: '6',
-    title: 'Charity Run 5K',
-    category: 'Sports',
-    date: '2026-09-05',
-    city: 'Nairobi',
-    location: 'Nairobi, Kenya',
-    time: '7:00 AM',
-    price: 15,
-    capacity: 1000,
-    registeredCount: 650,
-    image: 'https://via.placeholder.com/400x250/ef4444/ffffff?text=Charity+Run',
-    description: 'Run for a cause. All proceeds go to local community development projects.',
-  },
-]
+const CHIPS = ['All', 'Music', 'Food', 'Tech', 'Arts']
+const CAT_MAP = { Music: 'Music', Food: 'Food', Tech: 'Technology', Arts: 'Arts' }
 
-const CATEGORIES = [
-  'Technology',
-  'Business',
-  'Music',
-  'Sports',
-  'Education',
-  'Arts',
-]
-
-const FEATURES = [
-  {
-    title: 'Discover Events',
-    description: 'Find events that match your interests and discover new experiences happening around you.',
-    icon: '🔍',
-  },
-  {
-    title: 'Easy Registration',
-    description: 'Register for events quickly and keep track of the events you plan to attend.',
-    icon: '✅',
-  },
-  {
-    title: 'Digital Tickets',
-    description: 'Keep your event tickets organized digitally and access them whenever you need them.',
-    icon: '🎫',
-  },
-]
+function fmtDate(iso) {
+  const d = new Date(iso)
+  return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })
+}
 
 export default function Home() {
   const { user } = useAuth()
+  const [events, setEvents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [search, setSearch] = useState('')
+  const [chip, setChip] = useState('All')
+  const [sheetEvent, setSheetEvent] = useState(null)
+
+  const fetchEvents = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const params = {}
+      if (search) params.search = search
+      const data = await getEvents(params)
+      setEvents(data.events || [])
+    } catch (err) {
+      setError('Failed to load events. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }, [search])
+
+  useEffect(() => {
+    const t = setTimeout(fetchEvents, 150)
+    return () => clearTimeout(t)
+  }, [search, fetchEvents])
+
+  useEffect(() => {
+    fetchEvents()
+  }, [fetchEvents])
+
+  if (loading) return <Loading text="Loading events..." />
+  if (error) return <ErrorMessage message={error} />
+
+  const filtered = chip === 'All'
+    ? events
+    : events.filter((e) => e.category === CAT_MAP[chip])
+
+  const featured = filtered[0]
 
   return (
-    <div className="home">
-      <section className="hero">
-        <div className="container">
-          <div className="hero-content">
-            <h1 className="hero-title">
-              Discover Events Worth Experiencing
-            </h1>
-            <p className="hero-subtitle">
-              Find exciting events, connect with amazing people, and create unforgettable experiences.
-            </p>
-            <div className="hero-search">
-              <div className="hero-search-inner">
-                <input
-                  type="text"
-                  placeholder="Search for events..."
-                  className="hero-search-input"
-                  readOnly
-                />
-                <Link to="/events" className="btn btn-primary hero-search-btn">
-                  Search
-                </Link>
-              </div>
-            </div>
-            <div className="hero-actions">
-              <Link to="/events" className="btn btn-primary btn-lg">
-                Explore Events
-              </Link>
-              {user ? (
-                <Link to="/create-event" className="btn btn-outline btn-lg">
-                  Create an Event
-                </Link>
-              ) : (
-                <Link to="/register" className="btn btn-outline btn-lg">
-                  Create Account
-                </Link>
-              )}
-            </div>
-          </div>
+    <div className="page page--discover">
+      {sheetEvent && (
+        <TicketSheet event={sheetEvent} onClose={() => setSheetEvent(null)} />
+      )}
+      <div className="container">
+        <h1>Nairobi, this week.</h1>
+        <div className="field" style={{ marginBottom: 16 }}>
+          <label className="visually-hidden">Search events</label>
+          <input
+            className="input"
+            type="search"
+            placeholder="Search events"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
-      </section>
-
-      <section className="section">
-        <div className="container">
-          <div className="section-header">
-            <h2 className="section-title">Explore Popular Categories</h2>
-          </div>
-          <div className="categories-grid">
-            {CATEGORIES.map((category) => (
-              <Link
-                key={category}
-                to={`/events?category=${encodeURIComponent(category)}`}
-                className="category-card"
+        <div className="chips">
+          {CHIPS.map((c) => {
+            const active = chip === c
+            return (
+              <button
+                key={c}
+                type="button"
+                className={`chip ${active ? 'chip--selected' : ''}`}
+                onClick={() => setChip(c)}
               >
-                <span className="category-name">{category}</span>
-              </Link>
-            ))}
-          </div>
+                {c}
+              </button>
+            )
+          })}
         </div>
-      </section>
 
-      <section className="section section--alt">
-        <div className="container">
-          <div className="section-header">
-            <h2 className="section-title">Upcoming Events</h2>
-            <Link to="/events" className="section-link">
-              View all →
-            </Link>
+        {featured && (
+          <div className="poster" style={{ '--a': featured.colorA || '#c42a55', '--b': featured.colorB || '#ffb703' }}>
+            <div className="poster__art" aria-hidden="true" />
+            <div className="poster__body">
+              <span className="poster__kicker">Featured this week</span>
+              <div className="poster__day" aria-label={fmtDate(featured.date)}>{new Date(featured.date).getDate()}</div>
+              <h2 className="poster__title">{featured.title}</h2>
+              <p className="poster__meta">{fmtDate(featured.date)} at {featured.location}</p>
+              <button type="button" className="btn btn--primary" onClick={() => setSheetEvent(featured)} style={{ marginTop: 10, alignSelf: 'start' }}>
+                Get tickets
+              </button>
+            </div>
           </div>
-          <div className="events-grid">
-            {MOCK_EVENTS.map((event) => (
-              <EventCard key={event._id} event={event} />
-            ))}
-          </div>
-        </div>
-      </section>
+        )}
 
-      <section className="section">
-        <div className="container">
-          <div className="section-header">
-            <h2 className="section-title">Why Choose Evently?</h2>
-          </div>
-          <div className="features-grid">
-            {FEATURES.map((feature) => (
-              <div key={feature.title} className="feature-card">
-                <span className="feature-icon">{feature.icon}</span>
-                <h3 className="feature-title">{feature.title}</h3>
-                <p className="feature-description">{feature.description}</p>
-              </div>
-            ))}
-          </div>
+        <h2 style={{ fontSize: 20, margin: '24px 0 12px' }}>Events</h2>
+        <div className="stubs">
+          {filtered.length === 0 ? (
+            <p style={{ color: '#625f82', textAlign: 'center' }}>No events match your filters.</p>
+          ) : (
+            filtered.map((event) => {
+              const left = (event.capacity || 0) - (event.registeredCount || 0)
+              const price = event.price || 0
+              return (
+                <button
+                  key={event._id || event.id}
+                  type="button"
+                  className="stub"
+                  style={{ '--a': event.colorA || '#c42a55', '--b': event.colorB || '#ffb703' }}
+                  onClick={() => setSheetEvent(event)}
+                  aria-label={`View ${event.title}`}
+                >
+                  <div className="stub__date">
+                    <div className="stub__day">{new Date(event.date).getDate()}</div>
+                    <div className="stub__month">{new Date(event.date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</div>
+                    <span className="stub__notches" aria-hidden="true" />
+                  </div>
+                  <div className="stub__body">
+                    <div className="stub__title">{event.title}</div>
+                    <div className="stub__venue" aria-hidden="true">📍</div>
+                    <div className="stub__venue">{event.location}</div>
+                    <div className="stub__price">From KES {price.toLocaleString()}</div>
+                    <div className="stub__meter"><div className="stub__meter-fill" /></div>
+                    {left < 150 && (
+                      <div className={`stub__left ${left < 150 ? 'stub__left--low' : ''}`}>
+                        Only {left} left
+                      </div>
+                    )}
+                  </div>
+                </button>
+              )
+            })
+          )}
         </div>
-      </section>
 
-      <section className="section section--cta">
-        <div className="container">
-          <div className="cta-card">
-            <h2 className="cta-title">Ready to Host Your Own Event?</h2>
-            <p className="cta-description">
-              Create an event, reach your audience, and manage registrations from one place.
-            </p>
-            {user ? (
-              <Link to="/create-event" className="btn btn-primary btn-lg">
-                Create an Event
-              </Link>
-            ) : (
-              <Link to="/register" className="btn btn-primary btn-lg">
-                Create an Account
-              </Link>
-            )}
-          </div>
-        </div>
-      </section>
+        {user && user.role === 'organizer' && (
+          <p style={{ color: '#625f82', fontSize: 13, marginTop: 16 }}>
+            <Link to="/create-event">Create an event</Link>
+          </p>
+        )}
+      </div>
     </div>
   )
 }
