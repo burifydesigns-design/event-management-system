@@ -1,26 +1,17 @@
-const db = require('../lib/db');
-const TABLE = 'ticket_instances';
+const mongoose = require('mongoose');
 
-module.exports = {
-  async findOne(opts) {
-    return db.findOne(TABLE, opts);
+const ticketInstanceSchema = new mongoose.Schema(
+  {
+    order: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true },
+    ticketType: { type: mongoose.Schema.Types.ObjectId, ref: 'TicketType', required: true },
+    event: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true },
+    attendee: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    qrToken: { type: String, required: true, unique: true }, // encoded into the QR code
+    status: { type: String, enum: ['valid', 'used', 'void'], default: 'valid' },
+    scannedAt: Date,
+    scannedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
-  async findById(id, opts) {
-    return db.findById(TABLE, id, opts);
-  },
-  async find(opts) {
-    return db.find(TABLE, opts);
-  },
-  async create(data) {
-    return db.create(TABLE, data);
-  },
-  async findByIdAndUpdate(id, data) {
-    return db.updateById(TABLE, id, data);
-  },
-  async updateMany(filter, data) {
-    return db.updateMany(TABLE, filter, data);
-  },
-  async countDocuments(filter) {
-    return db.count(TABLE, filter);
-  },
-};
+  { timestamps: true }
+);
+
+module.exports = mongoose.model('TicketInstance', ticketInstanceSchema);

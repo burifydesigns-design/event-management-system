@@ -38,13 +38,14 @@ function formatDate(value) {
 // included. Raw MongoDB documents / populated user objects are never emitted.
 function generateAttendeesCSV(registrations, options = {}) {
   const headers = [
-    'Name',
-    'Email',
     'Event',
+    'Attendee Name',
+    'Attendee Email',
     'Ticket Number',
     'Registration Date',
     'Registration Status',
     'Check-in Status',
+    'Check-in Date',
   ];
 
   const lines = [headers.map(escapeCsvField).join(',')];
@@ -54,18 +55,20 @@ function generateAttendeesCSV(registrations, options = {}) {
     const event = r.event || {};
     const checkedIn = r.checkedIn === true;
     const row = [
+      event.title || options.eventTitle || '',
       user.name || '',
       user.email || '',
-      event.title || options.eventTitle || '',
       r.ticketNumber || '',
       formatDate(r.registeredAt),
       r.status || '',
       checkedIn ? 'Checked In' : 'Not Checked In',
+      formatDate(r.checkedInAt),
     ].map(escapeCsvField);
 
     lines.push(row.join(','));
   }
 
+  // UTF-8 BOM helps Excel and other spreadsheet apps detect UTF-8 encoding.
   return `\uFEFF${lines.join('\n')}\n`;
 }
 

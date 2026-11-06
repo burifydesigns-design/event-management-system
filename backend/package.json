@@ -1,30 +1,17 @@
 {
-  "name": "event-management-system-backend",
+  "name": "event-management-backend",
   "version": "1.0.0",
-  "description": "Event Management API (Supabase / PostgreSQL)",
-  "main": "src/app.js",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
-    "test": "jest",
-    "lint": "eslint src --ext js"
-  },
+  "description": "Event management API backed by Supabase",
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "dev": "nodemon server.js" },
   "dependencies": {
-    "@supabase/supabase-js": "^2.119.0",
-    "bcryptjs": "^2.4.3",
+    "@supabase/supabase-js": "^2.57.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "express-rate-limit": "^7.2.0",
-    "helmet": "^7.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^6.9.13",
-    "qrcode": "^1.5.4",
-    "validator": "^13.12.0"
+    "nodemailer": "^6.10.1",
+    "qrcode": "^1.5.3"
   },
-  "devDependencies": {
-    "eslint": "^8.57.0",
-    "jest": "^29.7.0",
-    "supertest": "^6.3.4"
-  }
+  "devDependencies": { "nodemon": "^3.1.4" },
+  "allowScripts": { "nodemailer": true }
 }

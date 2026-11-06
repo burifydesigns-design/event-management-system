@@ -1,23 +1,14 @@
-const db = require('../lib/db');
-const TABLE = 'ticket_types';
+const mongoose = require('mongoose');
 
-module.exports = {
-  async findOne(opts) {
-    return db.findOne(TABLE, opts);
+const ticketTypeSchema = new mongoose.Schema(
+  {
+    event: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true },
+    name: { type: String, required: true }, // e.g. Regular, VIP
+    price: { type: Number, required: true },
+    quantityAvailable: { type: Number, required: true },
+    quantitySold: { type: Number, default: 0 },
   },
-  async findById(id, opts) {
-    return db.findById(TABLE, id, opts);
-  },
-  async find(opts) {
-    return db.find(TABLE, opts);
-  },
-  async create(data) {
-    return db.create(TABLE, data);
-  },
-  async findByIdAndUpdate(id, data) {
-    return db.updateById(TABLE, id, data);
-  },
-  async countDocuments(filter) {
-    return db.count(TABLE, filter);
-  },
-};
+  { timestamps: true }
+);
+
+module.exports = mongoose.model('TicketType', ticketTypeSchema);

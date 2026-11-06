@@ -1,23 +1,13 @@
-const db = require('../lib/db');
-const TABLE = 'orders';
+const mongoose = require('mongoose');
 
-module.exports = {
-  async findOne(opts) {
-    return db.findOne(TABLE, opts);
+const orderSchema = new mongoose.Schema(
+  {
+    attendee: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    event: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true },
+    totalAmount: { type: Number, required: true },
+    status: { type: String, enum: ['pending', 'paid', 'failed'], default: 'pending' },
   },
-  async findById(id, opts) {
-    return db.findById(TABLE, id, opts);
-  },
-  async find(opts) {
-    return db.find(TABLE, opts);
-  },
-  async create(data) {
-    return db.create(TABLE, data);
-  },
-  async findByIdAndUpdate(id, data) {
-    return db.updateById(TABLE, id, data);
-  },
-  async countDocuments(filter) {
-    return db.count(TABLE, filter);
-  },
-};
+  { timestamps: true }
+);
+
+module.exports = mongoose.model('Order', orderSchema);

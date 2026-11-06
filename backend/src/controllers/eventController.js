@@ -1,116 +1,66 @@
-const Event = require('../models/Event');
-const { isValidUuid } = require('../config/supabase');
-const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
+const { getSupabase } = require('../config/db');
+const db = () => getSupabase();
+const eventShape = (event) => event ? { ...event, date: event.event_date, time: event.event_time } : event;
 
-const today = () => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
+exports.listEvents = async (req,res,next) => {
+ try {
+  const {search,category,city,date,price,page=1,limit=12}=req.query;
+  let q=db().from('events').select('*, organizer:profiles!events_organizer_id_fkey(id,name,email)',{count:'exact'}).eq('status','published');
+  if(search)q=q.or('title.ilike.%'+search+'%,description.ilike.%'+search+'%,city.ilike.%'+search+'%');
+  if(category)q=q.eq('category',category);
+  if(city)q=q.ilike('city','%'+city+'%');
+  if(date==='upcoming')q=q.gte('event_date',new Date().toISOString());
+  if(date==='past')q=q.lt('event_date',new Date().toISOString());
+  if(price==='free')q=q.eq('price',0);
+  if(price==='paid')q=q.gt('price',0);
+  const p=Math.max(1,Number(page)),l=Math.min(100,Math.max(1,Number(limit)));
+  const {data,error,count}=await q.order('event_date').range((p-1)*l,p*l-1);
+  if(error)throw error;
+  res.json({events:(data||[]).map(eventShape),page:p,limit:l,totalEvents:count||0,totalPages:Math.ceil((count||0)/l)});
+ }catch(err){next(err);}
 };
-
-exports.listEvents = async (req, res, next) => {
-  try {
-    const { search, category, city, date, price } = req.query;
-    const { page, limit, skip, error } = parsePagination(req.query);
-    if (error) return res.status(400).json({ message: error });
-
-    const query = { status: 'published' };
-
-    if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { city: { $regex: search, $options: 'i' } }
-      ];
-    }
-    if (category) query.category = category;
-    if (city) query.city = { $regex: city, $options: 'i' };
-    if (date === 'upcoming') query.date = { $gte: today() };
-    if (date === 'past') query.date = { $lt: today() };
-    if (price === 'free') query.price = 0;
-    if (price === 'paid') query.price = { $gt: 0 };
-
-    const totalEvents = await Event.countDocuments(query);
-    const { rows: events } = await Event.find({
-      filter: query,
-      populate: 'organizer',
-      sort: { date: 1, _id: 1 },
-      skip,
-      limit,
-    });
-
-    const pagination = buildPaginationMeta({ page, limit, totalItems: totalEvents });
-
-    res.json({ events, page, limit, totalEvents, totalPages: pagination.totalPages, pagination });
-  } catch (err) {
-    next(err);
-  }
+exports.getEvent=async(req,res,next)=>{
+ try{
+  const {data,error}=await db().from('events').select('*, organizer:profiles!events_organizer_id_fkey(id,name,email)').eq('id',req.params.id).maybeSingle();
+  if(error)throw error;if(!data)return res.status(404).json({message:'Event not found'});res.json(eventShape(data));
+ }catch(err){next(err);}
 };
-
-exports.getEvent = async (req, res, next) => {
-  try {
-    if (!isValidUuid(req.params.id)) {
-      return res.status(400).json({ message: 'Invalid event ID' });
-    }
-    const event = await Event.findById(req.params.id, { populate: 'organizer' });
-    if (!event) return res.status(404).json({ message: 'Event not found' });
-    res.json(event);
-  } catch (err) {
-    next(err);
-  }
+exports.createEvent=async(req,res,next)=>{
+ try{
+  const b=req.body;
+  const payload={title:b.title,description:b.description,category:b.category,event_date:b.event_date||b.date,event_time:b.event_time||b.time,location:b.location,city:b.city,capacity:Number(b.capacity),price:Number(b.price||0),image:b.image||'',organizer_id:req.user.userId,status:b.status||'draft'};
+  const {data,error}=await db().from('events').insert(payload).select('*').single();
+  if(error)throw error;res.status(201).json(eventShape(data));
+ }catch(err){next(err);}
 };
-
-exports.createEvent = async (req, res, next) => {
-  try {
-    const event = await Event.create({ ...req.body, organizer: req.user.userId });
-    res.status(201).json(event);
-  } catch (err) {
-    next(err);
-  }
+exports.updateEvent=async(req,res,next)=>{
+ try{
+  const {data:old,error:readError}=await db().from('events').select('organizer_id').eq('id',req.params.id).maybeSingle();
+  if(readError)throw readError;if(!old)return res.status(404).json({message:'Event not found'});
+  if(old.organizer_id!==req.user.userId&&req.user.role!=='admin')return res.status(403).json({message:'Not your event'});
+  const b=req.body,p={};
+  ['title','description','category','location','city','capacity','price','image','status'].forEach(k=>{if(b[k]!==undefined)p[k]=b[k];});
+  if(b.time!==undefined)p.event_time=b.time;if(b.event_time!==undefined)p.event_time=b.event_time;
+  if(b.date!==undefined)p.event_date=b.date;if(b.event_date!==undefined)p.event_date=b.event_date;
+  const {data,error}=await db().from('events').update(p).eq('id',req.params.id).select('*').single();
+  if(error)throw error;res.json(eventShape(data));
+ }catch(err){next(err);}
 };
-
-exports.updateEvent = async (req, res, next) => {
-  try {
-    const event = await Event.findById(req.params.id);
-    if (!event) return res.status(404).json({ message: 'Event not found' });
-    if (String(event.organizer) !== String(req.user.userId) && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not your event' });
-    }
-    const updateData = { ...req.body };
-    delete updateData.organizer;
-    delete updateData._id;
-    const updated = await Event.findByIdAndUpdate(req.params.id, updateData);
-    res.json(updated);
-  } catch (err) {
-    next(err);
-  }
+exports.deleteEvent=async(req,res,next)=>{
+ try{
+  const {data:old,error:readError}=await db().from('events').select('organizer_id').eq('id',req.params.id).maybeSingle();
+  if(readError)throw readError;if(!old)return res.status(404).json({message:'Event not found'});
+  if(old.organizer_id!==req.user.userId&&req.user.role!=='admin')return res.status(403).json({message:'Not your event'});
+  const {error}=await db().from('events').delete().eq('id',req.params.id);
+  if(error)throw error;res.json({message:'Event deleted'});
+ }catch(err){next(err);}
 };
-
-exports.deleteEvent = async (req, res, next) => {
-  try {
-    const event = await Event.findById(req.params.id);
-    if (!event) return res.status(404).json({ message: 'Event not found' });
-    if (String(event.organizer) !== String(req.user.userId) && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not your event' });
-    }
-    await Event.removeById(event.id);
-    res.json({ message: 'Event deleted' });
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.publishEvent = async (req, res, next) => {
-  try {
-    const event = await Event.findById(req.params.id);
-    if (!event) return res.status(404).json({ message: 'Event not found' });
-    if (String(event.organizer) !== String(req.user.userId) && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not your event' });
-    }
-    event.status = event.status === 'published' ? 'draft' : 'published';
-    const updated = await Event.findByIdAndUpdate(event.id, { status: event.status });
-    res.json(updated || event);
-  } catch (err) {
-    next(err);
-  }
+exports.publishEvent=async(req,res,next)=>{
+ try{
+  const {data:old,error:readError}=await db().from('events').select('organizer_id,status').eq('id',req.params.id).maybeSingle();
+  if(readError)throw readError;if(!old)return res.status(404).json({message:'Event not found'});
+  if(old.organizer_id!==req.user.userId&&req.user.role!=='admin')return res.status(403).json({message:'Not your event'});
+  const {data,error}=await db().from('events').update({status:old.status==='published'?'draft':'published'}).eq('id',req.params.id).select('*').single();
+  if(error)throw error;res.json(eventShape(data));
+ }catch(err){next(err);}
 };
