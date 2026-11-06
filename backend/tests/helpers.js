@@ -185,7 +185,25 @@ jest.mock('@supabase/supabase-js', () => {
         return { data: null, error: null, count: filtered.length };
       }
 
+      function project(row) {
+        if (!state.selectCols || state.selectCols === '*') return row;
+        const cols = String(state.selectCols)
+          .split(',')
+          .map((c) => c.trim())
+          .filter(Boolean)
+          .flatMap((c) => (c.includes(':') || c.includes('(') ? [] : [c]));
+        if (!cols.length) return row;
+        const out = {};
+        for (const c of cols) {
+          if (c === '*') return row;
+          if (Object.prototype.hasOwnProperty.call(row, c)) out[c] = row[c];
+        }
+        if (row.id !== undefined && out.id === undefined) out.id = row.id;
+        return out;
+      }
+
       let data = state.range ? filtered.slice(state.range[0], state.range[1] + 1) : filtered;
+      data = data.map(project);
       if (state.single) {
         return { data: data.length ? data[0] : null, error: null, count: undefined };
       }

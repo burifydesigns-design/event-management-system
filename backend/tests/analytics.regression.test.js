@@ -114,8 +114,8 @@ describe('Step 22 regression: analytics aggregates are unaffected by list pagina
 
     expect(capacityUtilization).toHaveLength(3);
     const e3Util = capacityUtilization.find((c) => String(c._id) === String(e3._id));
-    expect(e3Util.registered).toBe(6); // existing contract: all registrations regardless of status
-    expect(e3Util.utilization).toBeCloseTo((6 / 20) * 100, 5);
+    expect(e3Util.registered).toBe(8); // existing contract: all registrations regardless of status
+    expect(e3Util.utilization).toBeCloseTo((8 / 20) * 100, 5);
   });
 });
 

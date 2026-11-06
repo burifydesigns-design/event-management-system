@@ -180,10 +180,10 @@ function validatePaginationQuery(req, res, next) {
   }
   if (req.query.limit !== undefined) {
     const limit = Number(req.query.limit);
-    if (isNaN(limit) || limit < 1 || limit > 100 || !Number.isInteger(limit)) {
+    if (isNaN(limit) || limit < 1 || !Number.isInteger(limit)) {
       return res.status(400).json({ message: 'Invalid limit' });
     }
-    req.query.limit = limit;
+    req.query.limit = Math.min(limit, 100);
   }
   if (req.query.sortBy !== undefined) {
     const allowed = ['date', 'createdAt', 'title', 'price', 'capacity'];

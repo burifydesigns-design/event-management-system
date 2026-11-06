@@ -2,6 +2,8 @@ const Event = require('../models/Event');
 const Registration = require('../models/Registration');
 const { generateTicketToken } = require('../services/qrService');
 const { sendRegistrationEmail } = require('../services/emailService');
+const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
+const { isValidUuid } = require('../config/supabase');
 
 function generateTicketNumber() {
   return `EVT-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
@@ -56,14 +58,57 @@ exports.registerForEvent = async (req, res, next) => {
   }
 };
 
+const MY_EVENTS_TABS = ['upcoming', 'past', 'cancelled', 'all'];
+
 exports.getMyEvents = async (req, res, next) => {
   try {
-    const { rows: registrations } = await Registration.find({
-      filter: { user: req.user.userId, status: 'confirmed' },
+    const { page, limit, skip, error } = parsePagination(req.query, { defaultLimit: 10 });
+    if (error) return res.status(400).json({ message: error });
+
+    const tab = req.query.tab || 'all';
+    if (!MY_EVENTS_TABS.includes(tab)) {
+      return res.status(400).json({ message: 'Invalid tab. Use upcoming, past, cancelled, or all' });
+    }
+
+    if (!isValidUuid(req.user.userId)) {
+      return res.status(401).json({ message: 'Invalid user' });
+    }
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const { rows: all } = await Registration.find({
+      filter: { user: req.user.userId },
       populate: 'event',
-      sort: { registeredAt: -1 },
     });
-    res.json(registrations);
+
+    const eventDate = (r) => (r.event && r.event.date ? new Date(r.event.date) : null);
+    const isUpcoming = (r) => r.status === 'confirmed' && eventDate(r) && eventDate(r) >= startOfToday;
+    const isPast = (r) => r.status === 'confirmed' && (!eventDate(r) || eventDate(r) < startOfToday);
+    const isCancelled = (r) => r.status === 'cancelled';
+
+    const counts = {
+      upcoming: all.filter(isUpcoming).length,
+      past: all.filter(isPast).length,
+      cancelled: all.filter(isCancelled).length,
+    };
+
+    const matchers = { upcoming: isUpcoming, past: isPast, cancelled: isCancelled, all: () => true };
+    const filtered = all.filter(matchers[tab]).sort((a, b) => {
+      const at = a.registeredAt ? new Date(a.registeredAt).getTime() : 0;
+      const bt = b.registeredAt ? new Date(b.registeredAt).getTime() : 0;
+      if (bt !== at) return bt - at;
+      return String(b._id || b.id).localeCompare(String(a._id || a.id));
+    });
+
+    const totalItems = filtered.length;
+    const data = filtered.slice(skip, skip + limit);
+
+    res.json({
+      data,
+      pagination: buildPaginationMeta({ page, limit, totalItems }),
+      counts,
+    });
   } catch (err) {
     next(err);
   }
@@ -94,9 +139,9 @@ exports.cancelRegistration = async (req, res, next) => {
       return res.status(400).json({ message: 'Cannot cancel registration for past event' });
     }
     if (String(registration.user) === String(req.user.userId)) {
-      await Registration.findByIdAndUpdate(registration.id, { status: 'cancelled' });
+      await Registration.findByIdAndUpdate(registration.id || registration._id, { status: 'cancelled' });
     } else {
-      await Registration.removeById(registration.id);
+      await Registration.removeById(registration.id || registration._id);
     }
     res.json({ message: 'Registration cancelled' });
   } catch (err) {

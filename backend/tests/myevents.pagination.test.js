@@ -181,12 +181,12 @@ describe('GET /api/registrations/my-events - isolation and stability', () => {
     const sameTime = new Date();
     for (let i = 0; i < 11; i++) {
       const e = await makeEvent(i, i + 1);
-      const reg = await registerFor(e, userId);
-      await Registration.updateOne({ _id: reg._id }, { $set: { registeredAt: sameTime } });
+      const reg = await registerFor(e, userId, 'confirmed', 0);
+      await Registration.findByIdAndUpdate(reg._id || reg.id, { registeredAt: sameTime });
     }
 
     const seen = new Set();
-    for (let page = 1; page <= 2; page++) {
+    for (let page = 1; page <= 3; page++) {
       const res = await request(app)
         .get(`/api/registrations/my-events?limit=5&page=${page}`)
         .set('Authorization', `Bearer ${userToken}`);

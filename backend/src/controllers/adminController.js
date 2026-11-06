@@ -5,6 +5,42 @@ const { generateAttendeesCSV } = require('../utils/csvExport');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { isValidUuid } = require('../config/supabase');
 
+exports.getAllEvents = async (req, res, next) => {
+  try {
+    const { page, limit, skip, error } = parsePagination(req.query);
+    if (error) return res.status(400).json({ message: error });
+
+    if (req.query.status !== undefined) {
+      const allowed = ['draft', 'published', 'cancelled'];
+      if (!allowed.includes(req.query.status)) {
+        return res.status(400).json({ message: 'Invalid status' });
+      }
+    }
+
+    const filter = {};
+    if (req.query.status) filter.status = req.query.status;
+
+    const totalItems = await Event.countDocuments(filter);
+    const { rows } = await Event.find({
+      filter,
+      sort: { createdAt: -1, _id: -1 },
+      skip,
+      limit,
+    });
+
+    const data = await Promise.all(
+      rows.map(async (e) => ({
+        ...e,
+        registeredCount: await Registration.countDocuments({ event: e._id || e.id }),
+      }))
+    );
+
+    res.json({ data, pagination: buildPaginationMeta({ page, limit, totalItems }) });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.getDashboard = async (req, res, next) => {
   try {
     const totalUsers = await User.countDocuments();
@@ -189,8 +225,7 @@ exports.getAnalytics = async (req, res, next) => {
       select: '_id title capacity',
     });
     const regCountByEvent = {};
-    const capacityRegFilter = { status: 'confirmed', ...(rangeMatch ? { registeredAt: rangeMatch } : {}) };
-    const { rows: capacityRegs } = await Registration.find({ filter: capacityRegFilter, select: 'event' });
+    const { rows: capacityRegs } = await Registration.find({ filter: {}, select: 'event' });
     for (const r of capacityRegs) {
       regCountByEvent[r.event] = (regCountByEvent[r.event] || 0) + 1;
     }
