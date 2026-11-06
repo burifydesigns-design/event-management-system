@@ -32,7 +32,7 @@ export default function Home() {
       const data = await getEvents(params)
       setEvents(data.events || [])
     } catch (err) {
-      setError('Failed to load events. Please try again.')
+      setError(err?.message || 'Failed to load events. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -42,10 +42,6 @@ export default function Home() {
     const t = setTimeout(fetchEvents, 150)
     return () => clearTimeout(t)
   }, [search, fetchEvents])
-
-  useEffect(() => {
-    fetchEvents()
-  }, [fetchEvents])
 
   if (loading) return <Loading text="Loading events..." />
   if (error) return <ErrorMessage message={error} />
