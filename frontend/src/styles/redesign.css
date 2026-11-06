@@ -205,3 +205,12 @@ table.data-table th { color:var(--mu);font-size:11px;text-transform:uppercase;le
  .date-filter input { max-width:none;width:100%; }
  .chart-wrapper { min-height:190px; }
 }
+
+.shell__actions { gap:6px; }
+.shell__account-link { font-size:13px;min-height:40px;padding:8px 13px; }
+.shell__logout { font-size:13px;min-height:40px;padding:8px 13px; }
+@media(max-width:480px) {
+ .shell__actions { gap:3px; }
+ .shell__account-link,.shell__logout { font-size:12px;padding:7px 9px;min-height:36px; }
+ .shell__brand { font-size:1.15rem; }
+}
