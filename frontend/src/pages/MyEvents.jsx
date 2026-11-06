@@ -56,7 +56,7 @@ export default function MyEvents() {
       setCancelling(true);
       await cancelRegistration(cancelId);
       setRegistrations((prev) => prev.filter((r) => r._id !== cancelId));
-      setSuccess("Registration cancelled successfully.");
+      setSuccess("Registration cancelled.");
       setCancelId(null);
       try {
         const data = await getMyEvents({ tab: activeTab, page, limit });
@@ -70,115 +70,76 @@ export default function MyEvents() {
     }
   };
 
-  const displayList = registrations;
-
-  if (loading) return <Loading text="Loading your events..." />;
+  if (loading) return <Loading text="Loading your events..." />
 
   return (
-    <div className="page-my-events">
+    <div className="page page--my-events">
       <div className="container">
-        <div className="page-header">
-          <h1 className="page-title">My Events</h1>
-          <p className="page-subtitle">Manage your event registrations</p>
+        <div style={{ marginBottom: 16 }}>
+          <h1>My events</h1>
+          <p style={{ color: 'var(--mu)', fontSize: 14 }}>Manage your event registrations.</p>
         </div>
 
         {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
         {success && <SuccessMessage message={success} onClose={() => setSuccess(null)} />}
 
-        <div className="tabs">
-          <button
-            onClick={() => handleTabChange("upcoming")}
-            className={`tab-btn ${activeTab === "upcoming" ? "tab-btn--active" : ""}`}
-          >
-            Upcoming ({counts.upcoming || 0})
-          </button>
-          <button
-            onClick={() => handleTabChange("past")}
-            className={`tab-btn ${activeTab === "past" ? "tab-btn--active" : ""}`}
-          >
-            Past ({counts.past || 0})
-          </button>
-          <button
-            onClick={() => handleTabChange("cancelled")}
-            className={`tab-btn ${activeTab === "cancelled" ? "tab-btn--active" : ""}`}
-          >
-            Cancelled ({counts.cancelled || 0})
-          </button>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          {['upcoming', 'past', 'cancelled'].map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => handleTabChange(tab)}
+              className={`chip ${activeTab === tab ? 'chip--selected' : ''}`}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)} ({counts[tab] || 0})
+            </button>
+          ))}
         </div>
 
-        {displayList.length === 0 ? (
-          <div className="empty-state">
-            <p className="empty-state-icon">📋</p>
-            <p className="empty-state-title">No {activeTab} events</p>
-            <p className="empty-state-text">
-              {activeTab === "upcoming"
-                ? "You haven't registered for any upcoming events yet."
-                : activeTab === "past"
-                ? "You have no past events."
-                : "You have no cancelled registrations."}
+        {registrations.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--mu)' }}>
+            <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>No {activeTab} events</p>
+            <p style={{ marginBottom: 12 }}>
+              {activeTab === "upcoming" ? "You haven't registered for any upcoming events yet." : activeTab === "past" ? "You have no past events." : "You have no cancelled registrations."}
             </p>
-            <Link to="/events" className="btn btn-primary">
-              Browse Events
-            </Link>
+            <Link to="/events" className="btn btn--primary">Browse events</Link>
           </div>
         ) : (
           <>
-            <div className="registrations-list">
-              {displayList.map((reg) => (
-                <div key={reg._id} className="registration-card">
-                  <div className="registration-card-content">
-                    <div className="registration-info">
-                      <h3 className="registration-event-title">
-                        {reg.event?.title || "Event"}
-                      </h3>
-                      <div className="registration-meta">
-                        <span>📅 {new Date(reg.event?.date || reg.date).toLocaleDateString()}</span>
-                        <span>📍 {reg.event?.city || reg.event?.location || ""}</span>
-                        <span>🎫 #{reg.ticketNumber}</span>
-                        <span>📊 {reg.status}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {registrations.map((reg) => (
+                <div key={reg._id} style={{ border: '1px solid var(--ln)', borderRadius: 6, background: 'var(--sf)', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                    <div>
+                      <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>{reg.event?.title || 'Event'}</h3>
+                      <div style={{ color: 'var(--mu)', fontSize: 13, marginTop: 2 }}>
+                        {new Date(reg.event?.date || reg.date).toLocaleDateString()} • {reg.event?.city || reg.event?.location || ''}
                       </div>
                     </div>
-                    <div className="registration-actions">
-                      <Link
-                        to={`/my-ticket/${reg._id}`}
-                        className="btn btn-outline btn-sm"
-                      >
-                        View Ticket
-                      </Link>
-                      <Link
-                        to={`/events/${reg.event?._id}`}
-                        className="btn btn-outline btn-sm"
-                      >
-                        View Event
-                      </Link>
-                      {reg.status === "confirmed" && activeTab !== "cancelled" && (
-                        <button
-                          onClick={() => setCancelId(reg._id)}
-                          className="btn btn-danger btn-sm"
-                        >
-                          Cancel
-                        </button>
-                      )}
-                    </div>
+                    <span className={`pill ${reg.status === 'confirmed' ? 'pill--ok' : 'pill--bad'}`}>{reg.status}</span>
+                  </div>
+                  <div style={{ color: 'var(--tx)', fontSize: 13 }}>Ticket #{reg.ticketNumber}</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                    <Link to={`/my-ticket/${reg._id}`} className="btn btn--ghost" style={{ height: 36, padding: '0 12px', fontSize: 13 }}>View ticket</Link>
+                    <Link to={`/events/${reg.event?._id}`} className="btn btn--ghost" style={{ height: 36, padding: '0 12px', fontSize: 13 }}>View event</Link>
+                    {reg.status === "confirmed" && activeTab !== "cancelled" && (
+                      <button onClick={() => setCancelId(reg._id)} className="btn btn--ghost" style={{ height: 36, padding: '0 12px', fontSize: 13 }}>Cancel</button>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
-            <Pagination
-              currentPage={pagination.page}
-              totalPages={pagination.totalPages}
-              onPageChange={handlePageChange}
-            />
+            <Pagination currentPage={pagination.page} totalPages={pagination.totalPages} onPageChange={handlePageChange} />
           </>
         )}
-      </div>
 
-      <ConfirmDialog
-        visible={!!cancelId}
-        message="Are you sure you want to cancel this registration?"
-        onConfirm={handleCancel}
-        onCancel={() => setCancelId(null)}
-      />
+        <ConfirmDialog
+          visible={!!cancelId}
+          message="Are you sure you want to cancel this registration?"
+          onConfirm={handleCancel}
+          onCancel={() => setCancelId(null)}
+        />
+      </div>
     </div>
   );
 }

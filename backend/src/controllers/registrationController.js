@@ -66,6 +66,19 @@ exports.getMyEvents = async (req, res, next) => {
   }
 };
 
+exports.getRegistration = async (req, res, next) => {
+  try {
+    const registration = await Registration.findById(req.params.id).populate('event');
+    if (!registration) return res.status(404).json({ message: 'Registration not found' });
+    if (String(registration.user) !== String(req.user.userId) && !['admin', 'organizer'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+    res.json(registration);
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.cancelRegistration = async (req, res, next) => {
   try {
     const registration = await Registration.findById(req.params.id);

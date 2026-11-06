@@ -11,22 +11,19 @@ export default function EditEvent() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    category: '',
-    date: '',
-    time: '',
-    location: '',
-    city: '',
-    capacity: '',
-    price: '',
-    image: '',
-    status: '',
+    title: '', description: '', category: '', date: '', time: '',
+    location: '', city: '', capacity: '', price: '', image: '', status: '',
+    colorA: '#c42a55', colorB: '#ffb703',
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
+
+  const COLOR_PRESETS = [
+    ['#c42a55', '#ffb703'], ['#5b2a86', '#ff9ec7'], ['#0a7e8c', '#b8f2e6'],
+    ['#b4440e', '#ffe066'], ['#1f7a4d', '#d9f99d'], ['#1d3557', '#8ecae6'],
+  ]
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -37,19 +34,16 @@ export default function EditEvent() {
           return
         }
         setFormData({
-          title: data.title || '',
-          description: data.description || '',
+          title: data.title || '', description: data.description || '',
           category: data.category || '',
           date: data.date ? data.date.split('T')[0] : '',
-          time: data.time || '',
-          location: data.location || '',
-          city: data.city || '',
-          capacity: data.capacity || '',
-          price: data.price || '',
-          image: data.image || '',
+          time: data.time || '', location: data.location || '',
+          city: data.city || '', capacity: data.capacity || '',
+          price: data.price || '', image: data.image || '',
           status: data.status || '',
+          colorA: data.colorA || '#c42a55', colorB: data.colorB || '#ffb703',
         })
-      } catch (err) {
+      } catch {
         setError('Unable to load event. Please try again.')
       } finally {
         setLoading(false)
@@ -63,18 +57,14 @@ export default function EditEvent() {
     setSaving(true)
     setError(null)
     setSuccess(null)
-
     try {
       const eventData = {
-        ...formData,
-        capacity: parseInt(formData.capacity),
+        ...formData, capacity: parseInt(formData.capacity) || 0,
         price: formData.price ? parseFloat(formData.price) : 0,
       }
       await updateEvent(id, eventData)
       setSuccess('Event updated successfully!')
-      setTimeout(() => {
-        navigate(`/events/${id}`)
-      }, 1500)
+      setTimeout(() => { navigate(`/events/${id}`) }, 1500)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update event. Please try again.')
     } finally {
@@ -82,196 +72,103 @@ export default function EditEvent() {
     }
   }
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
-  }
+  const handleChange = (e) => { setFormData({ ...formData, [e.target.name]: e.target.value }) }
+  const setColor = (a, b) => { setFormData({ ...formData, colorA: a, colorB: b }) }
 
   if (loading) return <Loading text="Loading event..." />
 
+  const isAdmin = user?.role === 'admin'
+
   return (
-    <div className="page-form">
+    <div className="page page--edit-event">
       <div className="container">
-        <div className="form-card">
-          <div className="form-header">
-            <h1 className="form-title">Edit Event</h1>
-            <p className="form-subtitle">Update event details</p>
-          </div>
-
-          {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
-          {success && <SuccessMessage message={success} />}
-
-          <form onSubmit={handleSubmit} className="form">
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="title" className="form-label">Event Title *</label>
-                <input
-                  id="title"
-                  type="text"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleChange}
-                  className="form-input"
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="category" className="form-label">Category *</label>
-                <select
-                  id="category"
-                  name="category"
-                  value={formData.category}
-                  onChange={handleChange}
-                  className="form-select"
-                  required
-                >
-                  <option value="">Select category</option>
-                  <option value="Technology">Technology</option>
-                  <option value="Business">Business</option>
-                  <option value="Music">Music</option>
-                  <option value="Sports">Sports</option>
-                  <option value="Arts">Arts</option>
-                  <option value="Education">Education</option>
-                  <option value="Health">Health</option>
-                  <option value="Food">Food</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="description" className="form-label">Description *</label>
-              <textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                className="form-textarea"
-                rows={5}
-                required
-              />
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="date" className="form-label">Date *</label>
-                <input
-                  id="date"
-                  type="date"
-                  name="date"
-                  value={formData.date}
-                  onChange={handleChange}
-                  className="form-input"
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="time" className="form-label">Time</label>
-                <input
-                  id="time"
-                  type="time"
-                  name="time"
-                  value={formData.time}
-                  onChange={handleChange}
-                  className="form-input"
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="location" className="form-label">Location *</label>
-                <input
-                  id="location"
-                  type="text"
-                  name="location"
-                  value={formData.location}
-                  onChange={handleChange}
-                  className="form-input"
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="city" className="form-label">City *</label>
-                <input
-                  id="city"
-                  type="text"
-                  name="city"
-                  value={formData.city}
-                  onChange={handleChange}
-                  className="form-input"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="capacity" className="form-label">Capacity *</label>
-                <input
-                  id="capacity"
-                  type="number"
-                  name="capacity"
-                  value={formData.capacity}
-                  onChange={handleChange}
-                  className="form-input"
-                  min="1"
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="price" className="form-label">Price ($)</label>
-                <input
-                  id="price"
-                  type="number"
-                  name="price"
-                  value={formData.price}
-                  onChange={handleChange}
-                  className="form-input"
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="image" className="form-label">Image URL</label>
-              <input
-                id="image"
-                type="url"
-                name="image"
-                value={formData.image}
-                onChange={handleChange}
-                className="form-input"
-                placeholder="https://example.com/image.jpg"
-              />
-            </div>
-
-            {user?.role === 'admin' && (
-              <div className="form-group">
-                <label htmlFor="status" className="form-label">Status</label>
-                <select
-                  id="status"
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  className="form-select"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
-            )}
-
-            <div className="form-actions">
-              <button type="button" onClick={() => navigate(-1)} className="btn btn-outline">
-                Cancel
-              </button>
-              <button type="submit" disabled={saving} className="btn btn-primary">
-                {saving ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
-          </form>
+        <div style={{ marginBottom: 16 }}>
+          <h1>Edit event</h1>
+          <p style={{ color: 'var(--mu)', fontSize: 14 }}>Update event details.</p>
         </div>
+        {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
+        {success && <SuccessMessage message={success} onClose={() => setSuccess(null)} />}
+        <form onSubmit={handleSubmit} className="form">
+          <div className="form-row">
+            <div className="field">
+              <label>Event title</label>
+              <input id="title" className="input" type="text" name="title" value={formData.title} onChange={handleChange} required />
+            </div>
+            <div className="field">
+              <label>Category</label>
+              <select id="category" className="input" name="category" value={formData.category} onChange={handleChange} required>
+                <option value="">Select category</option>
+                <option value="Technology">Technology</option>
+                <option value="Business">Business</option>
+                <option value="Music">Music</option>
+                <option value="Food">Food</option>
+                <option value="Arts">Arts</option>
+                <option value="Sports">Sports</option>
+                <option value="Education">Education</option>
+              </select>
+            </div>
+          </div>
+          <div className="field">
+            <label>Description</label>
+            <textarea id="description" className="input" name="description" value={formData.description} onChange={handleChange} rows={5} required />
+          </div>
+          <div className="form-row">
+            <div className="field">
+              <label>Date</label>
+              <input id="date" className="input" type="date" name="date" value={formData.date} onChange={handleChange} required />
+            </div>
+            <div className="field">
+              <label>Time</label>
+              <input id="time" className="input" type="time" name="time" value={formData.time} onChange={handleChange} />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="field">
+              <label>Location</label>
+              <input id="location" className="input" type="text" name="location" value={formData.location} onChange={handleChange} required />
+            </div>
+            <div className="field">
+              <label>City</label>
+              <input id="city" className="input" type="text" name="city" value={formData.city} onChange={handleChange} required />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="field">
+              <label>Capacity</label>
+              <input id="capacity" className="input" type="number" name="capacity" value={formData.capacity} onChange={handleChange} min="1" required />
+            </div>
+            <div className="field">
+              <label>Price (KES)</label>
+              <input id="price" className="input" type="number" name="price" value={formData.price} onChange={handleChange} min="0" step="0.01" />
+            </div>
+          </div>
+          <div className="field">
+            <label>Image URL (WebP/AVIF recommended)</label>
+            <input id="image" className="input" type="url" name="image" value={formData.image} onChange={handleChange} placeholder="https://example.com/image.webp" />
+          </div>
+          <div className="field">
+            <label>Event colors</label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+              {COLOR_PRESETS.map(([a, b]) => (
+                <button key={`${a}-${b}`} type="button" onClick={() => setColor(a, b)} style={{ width: 30, height: 30, borderRadius: 6, border: `2px solid ${formData.colorA === a && formData.colorB === b ? 'var(--tx)' : 'var(--ln)'}`, background: `linear-gradient(115deg, ${a} 0%, ${a} 68%)`, cursor: 'pointer' }} aria-label={`Colors ${a} / ${b}`} />
+              ))}
+            </div>
+          </div>
+          {isAdmin && (
+            <div className="field">
+              <label>Status</label>
+              <select id="status" className="input" name="status" value={formData.status} onChange={handleChange}>
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+          )}
+          <div className="form-actions">
+            <button type="button" onClick={() => navigate(-1)} className="btn btn--ghost">Cancel</button>
+            <button type="submit" disabled={saving} className="btn btn--primary">{saving ? 'Saving…' : 'Save changes'}</button>
+          </div>
+        </form>
       </div>
     </div>
   )

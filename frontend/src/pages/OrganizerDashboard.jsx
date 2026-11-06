@@ -1,390 +1,264 @@
-﻿import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+﻿import { useState, useEffect, useCallback, useRef } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { getOrganizerAnalytics } from '../services/ticketService'
-import {
-  listCoordinatorAssignments as listAssignments,
-  createCoordinatorAssignment,
-  deleteCoordinatorAssignment,
-  listCoordinators,
-} from '../services/ticketService'
+import { getEvents } from '../services/eventService'
+import { deleteEvent } from '../services/eventService'
 import Loading from '../components/Loading'
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
-import ConfirmDialog from '../components/ConfirmDialog'
-import {
-  Bar,
-  Line,
-  Doughnut,
-} from 'react-chartjs-2'
+
+const REDUCED = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+function nearest50(n) {
+  return Math.max(0, Math.round(Number(n) / 50) * 50)
+}
+
+function fmtDate(iso) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+// Animated counter: counts 0 -> value over 700ms unless reduced motion.
+function Counter({ value }) {
+  const [display, setDisplay] = useState(0)
+  useEffect(() => {
+    if (REDUCED || value === display) { setDisplay(value); return }
+    const start = performance.now()
+    const duration = 700
+    let frame
+    function step(now) {
+      const elapsed = now - start
+      const p = Math.min(elapsed / duration, 1)
+      // ease out
+      const eased = 1 - Math.pow(1 - p, 3)
+      setDisplay(Math.round(eased * value))
+      if (p < 1) frame = requestAnimationFrame(step)
+    }
+    frame = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(frame)
+  }, [value, display])
+  return <span className="counter-number">{display}</span>
+}
+
+// Small inline sparkline (120x36) in --ac.
+function Sparkline({ points }) {
+  const width = 120
+  const height = 36
+  const max = points.length ? Math.max(...points) : 1
+  const step = width / Math.max(points.length - 1, 1)
+  const d = points
+    .map((v, i) => {
+      const y = height - (v / max) * (height - 6)
+      return `${i * step},${y}`
+    })
+    .join(' ')
+  return (
+    <svg width={width} height={height} fill="none" role="img" aria-label="Check-in trend">
+      <polyline points={d} stroke="var(--ac)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 export default function OrganizerDashboard() {
+  const navigate = useNavigate()
   const [analytics, setAnalytics] = useState(null)
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
-  const [dateRange, setDateRange] = useState({ start: '', end: '' })
-  const [coordinators, setCoordinators] = useState([])
-  const [assignments, setAssignments] = useState([])
-  const [newAssignment, setNewAssignment] = useState({ coordinatorId: '', eventId: '' })
-  const [showAssignModal, setShowAssignModal] = useState(false)
-  const [deleteId, setDeleteId] = useState(null)
+  const [deleted, setDeleted] = useState({})
+  const [toast, setToast] = useState(null) // { id, title, timer }
+  const [search, setSearch] = useState('')
+  const timers = useRef({})
 
-  useEffect(() => {
-    fetchData()
-  }, [dateRange.start, dateRange.end])
-
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-      const [analyticsRes, eventsRes, coordinatorsRes, assignmentsRes] = await Promise.all([
-        getOrganizerAnalytics({ start: dateRange.start, end: dateRange.end }),
-        fetch('/api/events', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then((r) => r.json()),
-        listCoordinators(),
-        listAssignments(),
+      setError(null)
+      const [analyticsRes, eventsRes] = await Promise.all([
+        getOrganizerAnalytics(),
+        getEvents(),
       ])
       setAnalytics(analyticsRes)
-      setEvents(eventsRes.data || eventsRes.events || [])
-      setCoordinators(coordinatorsRes.data || [])
-      setAssignments(assignmentsRes.data || [])
+      setEvents(eventsRes.events || eventsRes.data || [])
     } catch (err) {
       setError('Unable to load organizer dashboard data.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => { fetchData() }, [fetchData])
 
   if (loading) return <Loading text="Loading organizer dashboard..." />
   if (error) return <ErrorMessage message={error} />
 
+  const capacityUtilization = analytics?.capacityUtilization || []
+  const registrationsOverTime = analytics?.registrationsOverTime || []
   const totalConfirmed = analytics?.totalConfirmed || 0
   const totalCheckedIn = analytics?.totalCheckedIn || 0
-  const checkInRate = analytics?.checkInRate || 0
-  const grossRevenue = analytics?.grossRevenue || 0
 
-  const registrationsOverTime = analytics?.registrationsOverTime || []
-  const checkInsOverTime = analytics?.checkInsOverTime || []
-  const revenueOverTime = analytics?.revenueOverTime || []
-  const capacityUtilization = analytics?.capacityUtilization || []
+  // Sold per event by title (from analytics), matched to event list for date/price.
+  const soldByTitle = {}
+  capacityUtilization.forEach((e) => { soldByTitle[String(e.title)] = { sold: e.registered || 0, capacity: e.capacity || 0 } })
+
+  let revenue = 0
+  const visibleEvents = events.filter((e) => {
+    const text = `${e.title} ${e.city} ${e.location}`.toLowerCase()
+    return text.includes(search.toLowerCase())
+  })
+  visibleEvents.forEach((e) => {
+    const s = soldByTitle[String(e.title)]
+    if (s) revenue += s.sold * (e.price || 0)
+  })
+
+  const checkinPoints = registrationsOverTime.slice(-12).map((d) => d.count)
+
+  // ----- Delete with undo -----
+  const handleDelete = (event) => {
+    const id = event._id || event.id
+    setDeleted((prev) => ({ ...prev, [id]: event }))
+    setEvents((prev) => prev.filter((e) => String(e._id || e.id) !== String(id)))
+    setSuccess(null)
+    const timer = setTimeout(() => {
+      deleteEvent(id)
+        .then(() => {
+          setDeleted((prev) => { const { [id]: _removed, ...rest } = prev; return rest })
+          setToast(null)
+        })
+        .catch((err) => {
+          setEvents((prev) => [...prev, event])
+          setDeleted((prev) => { const { [id]: _removed, ...rest } = prev; return rest })
+          setToast(null)
+          setError(err.response?.data?.message || 'Failed to delete event.')
+        })
+    }, 4000)
+    timers.current[id] = timer
+    setToast({ id, title: event.title })
+  }
+
+  const handleUndo = (id) => {
+    const event = deleted[id]
+    if (!event) return
+    if (timers.current[id]) clearTimeout(timers.current[id])
+    setEvents((prev) => [event, ...prev])
+    setDeleted((prev) => { const { [id]: _removed, ...rest } = prev; return rest })
+    setToast(null)
+    setSuccess('Event restored.')
+  }
+
+  // Dismiss toast after it expires
+  useEffect(() => {
+    if (!toast) return
+    const id = toast.id
+    return () => {
+      if (timers.current[id]) clearTimeout(timers.current[id])
+    }
+  }, [toast])
+
+  const statusPill = (event) => {
+    const s = soldByTitle[String(event.title)]
+    const sold = s ? s.sold : 0
+    const capacity = s ? s.capacity : (event.capacity || 0)
+    const pct = capacity > 0 ? sold / capacity : 0
+    return pct > 0.9 ? (
+      <span className="pill pill--bad">Almost full</span>
+    ) : (
+      <span className="pill pill--ok">On sale</span>
+    )
+  }
+
+  const soldText = (event) => {
+    const s = soldByTitle[String(event.title)]
+    const sold = s ? s.sold : 0
+    const capacity = s ? s.capacity : (event.capacity || 0)
+    return `Sold ${sold} of ${capacity}`
+  }
 
   return (
-    <div className="page-dashboard page-dashboard--organizer">
+    <div className="page page--organizer">
+      {toast && (
+        <div className="toast" role="status" aria-live="polite">
+          <span className="toast__msg">Event deleted</span>
+          <div className="toast__actions">
+            <button type="button" className="btn btn--ghost" onClick={() => handleUndo(toast.id)}>Undo</button>
+          </div>
+        </div>
+      )}
       <div className="container">
-        <div className="page-header">
-          <div className="header-content">
-            <h1 className="page-title">Organizer Control Center</h1>
-            <p className="page-subtitle">Manage your events, tickets, and staff</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 16 }}>
+          <div>
+            <h1>Overview</h1>
+            <p style={{ color: '#625f82', fontSize: 14 }}>Your events at a glance.</p>
           </div>
-          <div className="header-actions">
-            <Link to="/create-event" className="btn btn-primary">
-              + Create Event
-            </Link>
-          </div>
+          <Link to="/create-event" className="btn btn--primary">New event</Link>
         </div>
 
         {success && <SuccessMessage message={success} onClose={() => setSuccess(null)} />}
 
-        <div className="date-filter">
-          <label>Date Range</label>
-          <input
-            type="date"
-            value={dateRange.start}
-            onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-          />
-          <span>to</span>
-          <input
-            type="date"
-            value={dateRange.end}
-            onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-          />
-          <button onClick={fetchData} className="btn btn-outline btn-sm">Apply</button>
-        </div>
-
-        <div className="stats-grid">
-          <div className="stat-card stat-card--primary">
-            <div className="stat-icon">📅</div>
-            <div className="stat-content">
-              <p className="stat-value">{events.length}</p>
-              <p className="stat-label">My Events</p>
-            </div>
+        <div className="summary-list">
+          <div className="summary-row">
+            <Counter value={totalConfirmed} />
+            <span className="summary-label">tickets sold</span>
           </div>
-          <div className="stat-card stat-card--success">
-            <div className="stat-icon">🎫</div>
-            <div className="stat-content">
-              <p className="stat-value">{totalConfirmed}</p>
-              <p className="stat-label">Tickets Sold</p>
-            </div>
+          <div className="summary-row">
+            <span className="summary-value">KES {revenue.toLocaleString()}</span>
+            <span className="summary-label">revenue</span>
           </div>
-          <div className="stat-card stat-card--accent">
-            <div className="stat-icon">✅</div>
-            <div className="stat-content">
-              <p className="stat-value">{totalCheckedIn}</p>
-              <p className="stat-label">Checked In</p>
-            </div>
-          </div>
-          <div className="stat-card stat-card--warning">
-            <div className="stat-icon">💰</div>
-            <div className="stat-content">
-              <p className="stat-value">${grossRevenue.toLocaleString()}</p>
-              <p className="stat-label">Gross Revenue</p>
-            </div>
-          </div>
-          <div className="stat-card stat-card--info">
-            <div className="stat-icon">📊</div>
-            <div className="stat-content">
-              <p className="stat-value">{checkInRate}%</p>
-              <p className="stat-label">Check-in Rate</p>
-            </div>
+          <div className="summary-row">
+            <Counter value={totalCheckedIn} />
+            <span className="summary-label">checked in</span>
+            <span className="summary-sparkline"><Sparkline points={checkinPoints} /></span>
           </div>
         </div>
 
-        <div className="dashboard-grid">
-          <div className="dashboard-section chart-section">
-            <div className="section-header">
-              <h2 className="section-title">Registration Trends</h2>
-            </div>
-            <div className="chart-wrapper">
-              {registrationsOverTime.length > 0 ? (
-                <Line
-                  data={{
-                    labels: registrationsOverTime.map((d) => d._id),
-                    datasets: [{
-                      label: 'Registrations',
-                      data: registrationsOverTime.map((d) => d.count),
-                      borderColor: '#4f46e5',
-                      backgroundColor: 'rgba(79, 70, 229, 0.1)',
-                      fill: true,
-                      tension: 0.4,
-                    }],
-                  }}
-                  options={{ responsive: true, plugins: { legend: { display: false } } }}
-                />
-              ) : (
-                <div className="empty-state"><p>No registration data.</p></div>
-              )}
-            </div>
+        <div className="section">
+          <div className="field" style={{ marginBottom: 12 }}>
+            <label className="visually-hidden">Search events</label>
+            <input className="input" type="search" placeholder="Search events" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-
-          <div className="dashboard-section chart-section">
-            <div className="section-header">
-              <h2 className="section-title">Check-ins Over Time</h2>
-            </div>
-            <div className="chart-wrapper">
-              {checkInsOverTime.length > 0 ? (
-                <Line
-                  data={{
-                    labels: checkInsOverTime.map((d) => d._id),
-                    datasets: [{
-                      label: 'Check-ins',
-                      data: checkInsOverTime.map((d) => d.count),
-                      borderColor: '#10b981',
-                      backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                      fill: true,
-                      tension: 0.4,
-                    }],
-                  }}
-                  options={{ responsive: true, plugins: { legend: { display: false } } }}
-                />
-              ) : (
-                <div className="empty-state"><p>No check-in data.</p></div>
-              )}
-            </div>
-          </div>
-
-          <div className="dashboard-section chart-section">
-            <div className="section-header">
-              <h2 className="section-title">Capacity Utilization</h2>
-            </div>
-            <div className="chart-wrapper">
-              {capacityUtilization.length > 0 ? (
-                <Doughnut
-                  data={{
-                    labels: capacityUtilization.map((e) => e.title),
-                    datasets: [{
-                      data: capacityUtilization.map((e) => e.utilization),
-                      backgroundColor: ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444'],
-                    }],
-                  }}
-                  options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
-                />
-              ) : (
-                <div className="empty-state"><p>No events with capacity data.</p></div>
-              )}
-            </div>
-          </div>
-
-          <div className="dashboard-section chart-section">
-            <div className="section-header">
-              <h2 className="section-title">Revenue Over Time</h2>
-            </div>
-            <div className="chart-wrapper">
-              {revenueOverTime.length > 0 ? (
-                <Bar
-                  data={{
-                    labels: revenueOverTime.map((d) => d._id),
-                    datasets: [{
-                      label: 'Revenue ($)',
-                      data: revenueOverTime.map((d) => d.gross),
-                      backgroundColor: '#4f46e5',
-                    }],
-                  }}
-                  options={{ responsive: true, plugins: { legend: { display: false } } }}
-                />
-              ) : (
-                <div className="empty-state"><p>No revenue data.</p></div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="dashboard-section">
-          <div className="section-header">
-            <h2 className="section-title">Event Performance</h2>
-          </div>
-          <div className="table-wrapper">
-            <table className="data-table">
+          <div className="table-wrap">
+            <table className="data">
               <thead>
                 <tr>
-                  <th>Event</th>
-                  <th>Date</th>
-                  <th>Capacity</th>
-                  <th>Registered</th>
-                  <th>Checked In</th>
-                  <th>Utilization</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th style={{ width: '44%' }}>Event</th>
+                  <th style={{ width: '26%' }}>Date</th>
+                  <th style={{ width: '20%' }}>Sold</th>
+                  <th style={{ width: '10%' }}>Status</th>
+                  <th style={{ width: '10%' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {(analytics?.events || []).map((event) => (
-                  <tr key={event.id}>
-                    <td>{event.title}</td>
-                    <td>{new Date(event.date).toLocaleDateString()}</td>
-                    <td>{event.capacity}</td>
-                    <td>{event.registered || 0}</td>
-                    <td>{event.checkedIn || 0}</td>
-                    <td>{event.utilization ? event.utilization.toFixed(1) + '%' : '0%'}</td>
-                    <td><span className={`badge badge-${event.status}`}>{event.status}</span></td>
-                    <td>
-                      <Link to={`/analytics/events/${event.id}`} className="btn btn-outline btn-sm">Analytics</Link>
-                    </td>
-                  </tr>
-                ))}
+                {visibleEvents.length === 0 ? (
+                  <tr><td colSpan={5} style={{ color: '#625f82', textAlign: 'center', padding: 20 }}>No events found.</td></tr>
+                ) : (
+                  visibleEvents.map((event) => {
+                    const id = event._id || event.id
+                    const isDeleted = !!deleted[id]
+                    if (isDeleted) return null
+                    const s = soldByTitle[String(event.title)]
+                    const sold = s ? s.sold : 0
+                    const capacity = s ? s.capacity : (event.capacity || 0)
+                    const pct = capacity > 0 ? sold / capacity : 0
+                    return (
+                      <tr key={id}>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{event.title}</div>
+                          <div style={{ fontSize: 12, color: '#625f82' }}>{fmtDate(event.date)}</div>
+                        </td>
+                        <td>{soldText(event)}</td>
+                        <td>{pct > 0.9 ? <span className="pill pill--bad">Almost full</span> : <span className="pill pill--ok">On sale</span>}</td>
+                        <td>
+                          <button type="button" className="btn btn--icon" onClick={() => handleDelete(event)} aria-label={`Delete ${event.title}`} title="Delete">✕</button>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
               </tbody>
             </table>
           </div>
         </div>
-
-        <div className="dashboard-section">
-          <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 className="section-title">Coordinator Assignments</h2>
-            <button onClick={() => setShowAssignModal(true)} className="btn btn-primary btn-sm">Assign Coordinator</button>
-          </div>
-          <div className="table-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Coordinator</th>
-                  <th>Event</th>
-                  <th>Assigned At</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {assignments.map((a) => (
-                  <tr key={a.id}>
-                    <td>{a.coordinator.name} ({a.coordinator.email})</td>
-                    <td>{a.event.title}</td>
-                    <td>{new Date(a.assignedAt).toLocaleDateString()}</td>
-                    <td>
-                      <button
-                        onClick={() => setDeleteId(a.id)}
-                        className="btn btn-danger btn-sm"
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {showAssignModal && (
-          <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h3 className="modal-title">Assign Coordinator to Event</h3>
-              </div>
-              <div className="modal-body">
-                <div className="form">
-                  <div className="form-group">
-                    <label className="form-label">Coordinator</label>
-                    <select
-                      value={newAssignment.coordinatorId}
-                      onChange={(e) => setNewAssignment({ ...newAssignment, coordinatorId: e.target.value })}
-                      className="form-input"
-                    >
-                      <option value="">Select coordinator</option>
-                      {coordinators.map((c) => (
-                        <option key={c.id} value={c.id}>{c.name} ({c.email})</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Event</label>
-                    <select
-                      value={newAssignment.eventId}
-                      onChange={(e) => setNewAssignment({ ...newAssignment, eventId: e.target.value })}
-                      className="form-input"
-                    >
-                      <option value="">Select event</option>
-                      {events.map((e) => (
-                        <option key={e.id} value={e.id}>{e.title}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button onClick={() => setShowAssignModal(false)} className="btn btn-outline">Cancel</button>
-                <button
-                  onClick={async () => {
-                    try {
-                      await createCoordinatorAssignment(newAssignment)
-                      setSuccess('Coordinator assigned successfully.')
-                      setShowAssignModal(false)
-                      setNewAssignment({ coordinatorId: '', eventId: '' })
-                      fetchData()
-                    } catch (err) {
-                      setError(err.response?.data?.message || 'Failed to assign coordinator.')
-                    }
-                  }}
-                  className="btn btn-primary"
-                >
-                  Assign
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <ConfirmDialog
-          visible={!!deleteId}
-          message="Remove this coordinator assignment?"
-          onConfirm={async () => {
-            try {
-              await deleteCoordinatorAssignment(deleteId)
-              setSuccess('Assignment removed.')
-              setDeleteId(null)
-              fetchData()
-            } catch (err) {
-              setError(err.response?.data?.message || 'Failed to remove assignment.')
-            }
-          }}
-          onCancel={() => setDeleteId(null)}
-        />
       </div>
     </div>
   )
