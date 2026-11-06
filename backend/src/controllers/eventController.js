@@ -1,5 +1,6 @@
 const { getSupabase } = require('../config/db');
 const db = () => getSupabase();
+const eventShape = (event) => event ? { ...event, date: event.event_date, time: event.event_time } : event;
 
 exports.listEvents = async (req, res, next) => {
   try {
@@ -15,7 +16,7 @@ exports.listEvents = async (req, res, next) => {
     const p = Math.max(1, Number(page)), l = Math.min(100, Math.max(1, Number(limit)));
     const { data, error, count } = await q.order('event_date').range((p-1)*l, p*l-1);
     if (error) throw error;
-    res.json({ events: data, page:p, limit:l, totalEvents:count || 0, totalPages:Math.ceil((count || 0)/l) });
+    res.json({ events: (data || []).map(eventShape), page:p, limit:l, totalEvents:count || 0, totalPages:Math.ceil((count || 0)/l) });
   } catch (err) { next(err); }
 };
 exports.getEvent = async (req,res,next) => {
@@ -29,7 +30,7 @@ exports.createEvent = async (req,res,next) => {
     const b=req.body;
     const payload={ title:b.title,description:b.description,category:b.category,event_date:b.event_date || b.date,event_time:b.event_time || b.time,location:b.location,city:b.city,capacity:Number(b.capacity),price:Number(b.price||0),image:b.image||'',organizer_id:req.user.userId,status:b.status||'draft' };
     const {data,error}=await db().from('events').insert(payload).select('*').single();
-    if(error) throw error; res.status(201).json(data);
+    if(error) throw error; res.status(201).json(eventShape(data));
   } catch(err){next(err);}
 };
 exports.updateEvent = async(req,res,next)=>{
