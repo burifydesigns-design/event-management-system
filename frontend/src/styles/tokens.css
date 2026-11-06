@@ -1,0 +1,67 @@
+/* Design tokens — single source of truth. No hardcoded colors elsewhere. */
+:root {
+  --bg: #f4f1fa;
+  --sf: #ffffff;
+  --sf2: #e9e5f5;
+  --tx: #0d0b2e;
+  --mu: #625f82;
+  --ln: #0d0b2e1f;
+  --ac: #2b3cff;
+  --ok: #0f9d58;
+  --bad: #d62839;
+  --wr: #b86e00;
+  --e: cubic-bezier(.2, .8, .2, 1);
+  --font: "Bricolage Grotesque", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+
+/* Dark theme: via system preference (unless forced light) OR forced dark attribute. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0a22;
+    --sf: #16153b;
+    --sf2: #201f4d;
+    --tx: #f1eeff;
+    --mu: #a09dc8;
+    --ln: #f1eeff24;
+    --ac: #5865ff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b0a22;
+  --sf: #16153b;
+  --sf2: #201f4d;
+  --tx: #f1eeff;
+  --mu: #a09dc8;
+  --ln: #f1eeff24;
+  --ac: #5865ff;
+  color-scheme: dark;
+}
+
+/* Per-event colors are injected inline as --a / --b on the event root element. */
+
+/* Theme toggle button */
+.theme-toggle {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--ln);
+  background: var(--sf);
+  color: var(--tx);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
+  box-shadow: 0 1px 2px var(--ln);
+  transition: transform var(--e) 0.2s, border-color var(--e) 0.2s;
+}
+.theme-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ac);
+}
+.theme-toggle:active {
+  transform: scale(0.92);
+}

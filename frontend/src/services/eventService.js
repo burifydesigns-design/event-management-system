@@ -26,7 +26,7 @@ export const deleteEvent = async (id) => {
 }
 
 export const publishEvent = async (id) => {
-  const { data } = await api.put(`/events/${id}/publish`)
+  const { data } = await api.patch(`/events/${id}/publish`)
   return data
 }
 

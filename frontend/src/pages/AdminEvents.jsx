@@ -36,7 +36,7 @@ export default function AdminEvents() {
       setActionLoading(true)
       await deleteEvent(deleteId)
       setEvents((prev) => prev.filter((e) => e._id !== deleteId))
-      setSuccess('Event deleted successfully.')
+      setSuccess('Event deleted.')
       setDeleteId(null)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to delete event.')
@@ -52,7 +52,7 @@ export default function AdminEvents() {
       setEvents((prev) =>
         prev.map((e) => (e._id === id ? { ...e, status: 'published' } : e))
       )
-      setSuccess('Event published successfully.')
+      setSuccess('Event published.')
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to publish event.')
     } finally {
@@ -61,16 +61,14 @@ export default function AdminEvents() {
   }
 
   return (
-    <div className="page-admin-events">
+    <div className="page page--admin">
       <div className="container">
-        <div className="page-header">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 16 }}>
           <div>
-            <h1 className="page-title">Event Management</h1>
-            <p className="page-subtitle">Manage all events on the platform</p>
+            <h1>Events</h1>
+            <p style={{ color: '#625f82', fontSize: 14 }}>Manage all events on the platform.</p>
           </div>
-          <Link to="/create-event" className="btn btn-primary">
-            Create Event
-          </Link>
+          <Link to="/create-event" className="btn btn--primary">New event</Link>
         </div>
 
         {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
@@ -79,63 +77,41 @@ export default function AdminEvents() {
         {loading ? (
           <Loading text="Loading events..." />
         ) : events.length === 0 ? (
-          <div className="empty-state">
-            <p className="empty-state-icon">📭</p>
-            <p className="empty-state-title">No events found</p>
-          </div>
+          <p style={{ color: '#625f82', textAlign: 'center', padding: 24 }}>No events found.</p>
         ) : (
-          <div className="table-wrapper">
-            <table className="data-table">
+          <div className="table-wrap">
+            <table className="data">
               <thead>
                 <tr>
-                  <th>Title</th>
-                  <th>Category</th>
-                  <th>Date</th>
-                  <th>City</th>
-                  <th>Status</th>
-                  <th>Capacity</th>
-                  <th>Registrations</th>
-                  <th>Actions</th>
+                  <th style={{ width: '30%' }}>Event</th>
+                  <th style={{ width: '16%' }}>Category</th>
+                  <th style={{ width: '16%' }}>Date</th>
+                  <th style={{ width: '14%' }}>City</th>
+                  <th style={{ width: '12%' }}>Status</th>
+                  <th style={{ width: '12%' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {events.map((event) => (
                   <tr key={event._id}>
                     <td>
-                      <Link to={`/events/${event._id}`} className="table-link">
-                        {event.title}
-                      </Link>
+                      <div style={{ fontWeight: 600 }}>{event.title}</div>
+                      <div style={{ fontSize: 12, color: '#625f82' }}>{new Date(event.date).toLocaleDateString()}</div>
                     </td>
                     <td>{event.category}</td>
-                    <td>{new Date(event.date).toLocaleDateString()}</td>
                     <td>{event.city}</td>
                     <td>
-                      <span className={`badge badge-${event.status}`}>
+                      <span className={`pill ${event.status === 'published' ? 'pill--ok' : 'pill--bad'}`}>
                         {event.status}
                       </span>
                     </td>
-                    <td>{event.capacity}</td>
-                    <td>{event.registeredCount || 0}</td>
                     <td>
-                      <div className="table-actions">
-                        <Link to={`/edit-event/${event._id}`} className="btn btn-sm btn-outline">
-                          Edit
-                        </Link>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <Link to={`/edit-event/${event._id}`} className="btn btn--ghost" style={{ height: 36, padding: '0 10px', fontSize: 13 }}>Edit</Link>
                         {event.status === 'draft' && (
-                          <button
-                            onClick={() => handlePublish(event._id)}
-                            disabled={actionLoading}
-                            className="btn btn-sm btn-primary"
-                          >
-                            Publish
-                          </button>
+                          <button onClick={() => handlePublish(event._id)} disabled={actionLoading} className="btn btn--ghost" style={{ height: 36, padding: '0 10px', fontSize: 13 }}>Publish</button>
                         )}
-                        <button
-                          onClick={() => setDeleteId(event._id)}
-                          className="btn btn-sm btn-danger"
-                        >
-                          Delete
-                        </button>
+                        <button onClick={() => setDeleteId(event._id)} className="btn btn--icon" aria-label={`Delete ${event.title}`} title="Delete">✕</button>
                       </div>
                     </td>
                   </tr>
@@ -144,14 +120,14 @@ export default function AdminEvents() {
             </table>
           </div>
         )}
-      </div>
 
-      <ConfirmDialog
-        visible={!!deleteId}
-        message="Are you sure you want to delete this event? This action cannot be undone."
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteId(null)}
-      />
+        <ConfirmDialog
+          visible={!!deleteId}
+          message="Are you sure you want to delete this event?"
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteId(null)}
+        />
+      </div>
     </div>
   )
 }

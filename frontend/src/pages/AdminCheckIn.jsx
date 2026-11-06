@@ -4,7 +4,7 @@ import Loading from '../components/Loading'
 import ErrorMessage from '../components/ErrorMessage'
 import SuccessMessage from '../components/SuccessMessage'
 import { getAllEvents } from '../services/adminService'
-import { scanQR } from '../services/adminService'
+import { checkInTicket } from '../services/adminService'
 
 export default function AdminCheckIn() {
   const [events, setEvents] = useState([])
@@ -44,12 +44,12 @@ export default function AdminCheckIn() {
     setScanResult(null)
 
     try {
-      const result = await scanQR(qrInput.trim(), selectedEventId)
+      const result = await checkInTicket(qrInput.trim(), selectedEventId)
       setScanResult(result)
-      setSuccess(`Successfully checked in: ${result.attendeeName || 'Attendee'}`)
+      setSuccess(result.message || 'Checked in successfully.')
       setQrInput('')
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid QR code or check-in failed.')
+      setError(err.response?.data?.message || 'Invalid ticket or check-in failed.')
     } finally {
       setScanning(false)
     }
@@ -133,10 +133,9 @@ export default function AdminCheckIn() {
           <div className="checkin-result">
             <h3>Check-in Result</h3>
             <div className="checkin-result-card">
-              <p><strong>Attendee:</strong> {scanResult.attendeeName || 'N/A'}</p>
-              <p><strong>Email:</strong> {scanResult.attendeeEmail || 'N/A'}</p>
               <p><strong>Ticket:</strong> {scanResult.ticketNumber || 'N/A'}</p>
-              <p><strong>Status:</strong> {scanResult.status || 'Confirmed'}</p>
+              <p><strong>Message:</strong> {scanResult.message || 'Checked in'}</p>
+              <p><strong>Checked in at:</strong> {scanResult.checkedInAt ? new Date(scanResult.checkedInAt).toLocaleString() : 'N/A'}</p>
             </div>
           </div>
         )}

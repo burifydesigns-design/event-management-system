@@ -15,9 +15,7 @@ export default function Profile() {
   const [success, setSuccess] = useState(null)
 
   useEffect(() => {
-    if (user) {
-      setName(user.name || '')
-    }
+    if (user) setName(user.name || '')
     setLoading(false)
   }, [user])
 
@@ -26,7 +24,6 @@ export default function Profile() {
     setSaving(true)
     setError(null)
     setSuccess(null)
-
     try {
       await updateProfile({ name })
       setSuccess('Profile updated successfully!')
@@ -40,48 +37,33 @@ export default function Profile() {
   if (loading) return <Loading text="Loading profile..." />
 
   return (
-    <div className="page-profile">
+    <div className="page page--profile">
       <div className="container">
-        <div className="profile-card">
-          <div className="profile-header">
-            <h1 className="profile-title">My Profile</h1>
-            <p className="profile-subtitle">Update your account information</p>
-          </div>
-
-          {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
-          {success && <SuccessMessage message={success} onClose={() => setSuccess(null)} />}
-
-          <div className="profile-info">
-            <div className="profile-field">
-              <span className="profile-label">Email</span>
-              <span className="profile-value">{user?.email}</span>
-            </div>
-            <div className="profile-field">
-              <span className="profile-label">Role</span>
-              <span className="profile-value profile-role">{user?.role}</span>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="form">
-            <div className="form-group">
-              <label htmlFor="name" className="form-label">Full Name</label>
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="form-input"
-                required
-              />
-            </div>
-
-            <div className="form-actions">
-              <button type="submit" disabled={saving} className="btn btn-primary">
-                {saving ? 'Saving...' : 'Update Profile'}
-              </button>
-            </div>
-          </form>
+        <div style={{ marginBottom: 16 }}>
+          <h1>My profile</h1>
+          <p style={{ color: 'var(--mu)', fontSize: 14 }}>Update your account information.</p>
         </div>
+        {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
+        {success && <SuccessMessage message={success} onClose={() => setSuccess(null)} />}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20, padding: 14, background: 'var(--sf2)', borderRadius: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+            <span style={{ color: 'var(--mu)', fontWeight: 600 }}>Email</span>
+            <span style={{ color: 'var(--tx)' }}>{user?.email}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+            <span style={{ color: 'var(--mu)', fontWeight: 600 }}>Role</span>
+            <span style={{ color: 'var(--tx)', fontWeight: 600 }}>{user?.role}</span>
+          </div>
+        </div>
+        <form onSubmit={handleSubmit} className="form">
+          <div className="field">
+            <label>Full name</label>
+            <input id="name" className="input" type="text" value={name} onChange={(e) => setName(e.target.value)} required />
+          </div>
+          <div className="form-actions">
+            <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'Saving…' : 'Update profile'}</button>
+          </div>
+        </form>
       </div>
     </div>
   )

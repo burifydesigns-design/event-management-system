@@ -20,7 +20,7 @@ export const cancelRegistration = async (id) => {
   return data
 }
 
-export const getMyEvents = async () => {
-  const { data } = await api.get('/registrations/my-events')
+export const getMyEvents = async (params = {}) => {
+  const { data } = await api.get('/registrations/my-events', { params })
   return data
 }
