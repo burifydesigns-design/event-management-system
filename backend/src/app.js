@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-
 const authRoutes = require('./routes/authRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const registrationRoutes = require('./routes/registrationRoutes');
@@ -8,24 +7,14 @@ const adminRoutes = require('./routes/adminRoutes');
 const errorHandler = require('./middleware/errorHandler');
 const connectDB = require('./config/db');
 
-connectDB();
-
 const app = express();
-app.use(
-  cors({
-    origin: "http://localhost:3000",
-    credentials: true,
-  })
-);
-app.use(express.json());
-
+app.use(cors({ origin: process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : true, credentials: true }));
+app.use(express.json({limit:'1mb'}));
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/registrations', registrationRoutes);
 app.use('/api/admin', adminRoutes);
-
-app.get('/', (req, res) => res.send('Event Management API running'));
-
+app.get('/', (_req,res)=>res.send('Event Management API running with Supabase'));
 app.use(errorHandler);
-
+connectDB().catch(err=>{ console.error(err.message); process.exit(1); });
 module.exports = app;
