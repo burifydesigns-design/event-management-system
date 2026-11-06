@@ -29,7 +29,7 @@ export default function Events() {
       const data = await getEvents(params)
       setEvents(data.events || [])
     } catch (err) {
-      setError('Failed to load events. Please try again.')
+      setError(err?.message || 'Failed to load events. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -39,10 +39,6 @@ export default function Events() {
     const t = setTimeout(fetchEvents, 150)
     return () => clearTimeout(t)
   }, [search, category, dateFilter, fetchEvents])
-
-  useEffect(() => {
-    fetchEvents()
-  }, [fetchEvents])
 
   const categories = [...new Set(events.map((e) => e.category))].sort()
 
