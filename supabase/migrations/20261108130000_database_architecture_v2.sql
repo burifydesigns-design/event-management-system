@@ -239,6 +239,29 @@ begin
   end loop;
 end $$;
 
+-- Keep soft-deleted events and their ticket types out of public discovery.
+drop policy if exists events_public_read_published on public.events;
+create policy events_public_read_published on public.events for select to anon
+using (status = 'published' and deleted_at is null);
+drop policy if exists events_authenticated_read_published_or_owner on public.events;
+create policy events_authenticated_read_published_or_owner on public.events for select to authenticated
+using ((status = 'published' and deleted_at is null)
+       or organizer_id = (select auth.uid())
+       or (select private.has_role(array['admin'])));
+
+drop policy if exists ticket_types_public_read_published on public.ticket_types;
+create policy ticket_types_public_read_published on public.ticket_types for select to anon
+using (exists (select 1 from public.events e
+              where e.id = ticket_types.event_id
+                and e.status = 'published' and e.deleted_at is null));
+drop policy if exists ticket_types_authenticated_read_published_or_manager on public.ticket_types;
+create policy ticket_types_authenticated_read_published_or_manager on public.ticket_types for select to authenticated
+using (exists (select 1 from public.events e
+              where e.id = ticket_types.event_id
+                and ((e.status = 'published' and e.deleted_at is null)
+                     or e.organizer_id = (select auth.uid())
+                     or (select private.has_role(array['admin']))));
+
 -- Remove accidental externally callable SECURITY DEFINER helper flagged by Supabase Advisor.
 do $
 begin
