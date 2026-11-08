@@ -1,5 +1,4 @@
-const { createClient } = require('@supabase/supabase-js');
-const { getSupabase } = require('../config/db');
+const { getSupabase, getSupabaseAnon } = require('../config/db');
 
 async function authMiddleware(req, res, next) {
   const header = req.headers.authorization;
@@ -8,9 +7,7 @@ async function authMiddleware(req, res, next) {
   }
   try {
     const token = header.slice(7);
-    const authClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const authClient = getSupabaseAnon();
     const { data: { user }, error } = await authClient.auth.getUser(token);
     if (error || !user) return res.status(401).json({ message: 'Invalid or expired token' });
     const { data: profile, error: profileError } = await getSupabase()
