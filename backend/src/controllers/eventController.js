@@ -5,7 +5,7 @@ const eventShape = (event) => event ? { ...event, date: event.event_date, time: 
 exports.listEvents = async (req,res,next) => {
  try {
   const {search,category,city,date,price,page=1,limit=12}=req.query;
-  let q=db().from('events').select('*, organizer:profiles!events_organizer_id_fkey(id,name,email)',{count:'exact'}).eq('status','published');
+  let q=db().from('events').select('*, organizer:profiles!events_organizer_id_fkey(id,name,email)',{count:'exact'}).eq('status','published').is('deleted_at',null);
   if(search)q=q.or('title.ilike.%'+search+'%,description.ilike.%'+search+'%,city.ilike.%'+search+'%');
   if(category)q=q.eq('category',category);
   if(city)q=q.ilike('city','%'+city+'%');
@@ -21,7 +21,7 @@ exports.listEvents = async (req,res,next) => {
 };
 exports.getEvent=async(req,res,next)=>{
  try{
-  const {data,error}=await db().from('events').select('*, organizer:profiles!events_organizer_id_fkey(id,name,email)').eq('id',req.params.id).maybeSingle();
+  const {data,error}=await db().from('events').select('*, organizer:profiles!events_organizer_id_fkey(id,name,email)').eq('id',req.params.id).eq('status','published').is('deleted_at',null).maybeSingle();
   if(error)throw error;if(!data)return res.status(404).json({message:'Event not found'});res.json(eventShape(data));
  }catch(err){next(err);}
 };
