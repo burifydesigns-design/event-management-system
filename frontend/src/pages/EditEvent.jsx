@@ -13,7 +13,7 @@ export default function EditEvent() {
   const [formData, setFormData] = useState({
     title: '', description: '', category: '', date: '', time: '',
     location: '', city: '', capacity: '', price: '', image: '', status: '',
-    colorA: '#c42a55', colorB: '#ffb703',
+    colorA: '#0b6b4f', colorB: '#f2b01e',
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -21,7 +21,7 @@ export default function EditEvent() {
   const [success, setSuccess] = useState(null)
 
   const COLOR_PRESETS = [
-    ['#c42a55', '#ffb703'], ['#5b2a86', '#ff9ec7'], ['#0a7e8c', '#b8f2e6'],
+    ['#0b6b4f', '#f2b01e'], ['#5b2a86', '#ff9ec7'], ['#0a7e8c', '#b8f2e6'],
     ['#b4440e', '#ffe066'], ['#1f7a4d', '#d9f99d'], ['#1d3557', '#8ecae6'],
   ]
 
@@ -41,7 +41,7 @@ export default function EditEvent() {
           city: data.city || '', capacity: data.capacity || '',
           price: data.price || '', image: data.image || '',
           status: data.status || '',
-          colorA: data.colorA || '#c42a55', colorB: data.colorB || '#ffb703',
+          colorA: data.colorA || '#0b6b4f', colorB: data.colorB || '#f2b01e',
         })
       } catch {
         setError('Unable to load event. Please try again.')

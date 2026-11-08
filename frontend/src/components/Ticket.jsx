@@ -11,7 +11,7 @@ export default function Ticket({ registration, event }) {
     width: 200,
     margin: 2,
     color: {
-      dark: '#1e293b',
+      dark: '#0e1f1a',
       light: '#ffffff',
     },
   })

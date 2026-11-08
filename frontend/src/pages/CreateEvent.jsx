@@ -20,15 +20,15 @@ export default function CreateEvent() {
     capacity: '',
     price: '',
     image: '',
-    colorA: '#c42a55',
-    colorB: '#ffb703',
+    colorA: '#0b6b4f',
+    colorB: '#f2b01e',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
 
   const COLOR_PRESETS = [
-    ['#c42a55', '#ffb703'],
+    ['#0b6b4f', '#f2b01e'],
     ['#5b2a86', '#ff9ec7'],
     ['#0a7e8c', '#b8f2e6'],
     ['#b4440e', '#ffe066'],

@@ -90,7 +90,7 @@ export default function Home() {
         </div>
 
         {featured && (
-          <div className="poster" style={{ '--a': featured.colorA || '#c42a55', '--b': featured.colorB || '#ffb703' }}>
+          <div className="poster" style={{ '--a': featured.colorA || '#0b6b4f', '--b': featured.colorB || '#f2b01e' }}>
             <div className="poster__art" aria-hidden="true" />
             <div className="poster__body">
               <span className="poster__kicker">Featured this week</span>
@@ -107,7 +107,7 @@ export default function Home() {
         <h2 style={{ fontSize: 20, margin: '24px 0 12px' }}>Events</h2>
         <div className="stubs">
           {filtered.length === 0 ? (
-            <p style={{ color: '#625f82', textAlign: 'center' }}>No events match your filters.</p>
+            <p style={{ color: 'var(--mu)', textAlign: 'center' }}>No events match your filters.</p>
           ) : (
             filtered.map((event) => {
               const left = (event.capacity || 0) - (event.registeredCount || 0)
@@ -117,7 +117,7 @@ export default function Home() {
                   key={event._id || event.id}
                   type="button"
                   className="stub"
-                  style={{ '--a': event.colorA || '#c42a55', '--b': event.colorB || '#ffb703' }}
+                  style={{ '--a': event.colorA || '#0b6b4f', '--b': event.colorB || '#f2b01e', '--fill': `${Math.min(100, Math.round(((event.registeredCount || 0) / Math.max(1, event.capacity || 1)) * 100))}%` }}
                   onClick={() => setSheetEvent(event)}
                   aria-label={`View ${event.title}`}
                 >
@@ -128,8 +128,7 @@ export default function Home() {
                   </div>
                   <div className="stub__body">
                     <div className="stub__title">{event.title}</div>
-                    <div className="stub__venue" aria-hidden="true">📍</div>
-                    <div className="stub__venue">{event.location}</div>
+                                        <div className="stub__venue">{event.location}</div>
                     <div className="stub__price">From KES {price.toLocaleString()}</div>
                     <div className="stub__meter"><div className="stub__meter-fill" /></div>
                     {left < 150 && (
@@ -145,7 +144,7 @@ export default function Home() {
         </div>
 
         {user && user.role === 'organizer' && (
-          <p style={{ color: '#625f82', fontSize: 13, marginTop: 16 }}>
+          <p style={{ color: 'var(--mu)', fontSize: 13, marginTop: 16 }}>
             <Link to="/create-event">Create an event</Link>
           </p>
         )}

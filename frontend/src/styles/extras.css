@@ -1,0 +1,288 @@
+/* Analytics, check-in, metrics and status badges.
+   These classes were used in pages but had no styles anywhere. */
+
+/* ---------- Page wrappers ---------- */
+.page--admin .container,
+.page--create-event .container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+.page--create-event .container {
+  max-width: 860px;
+}
+
+/* ---------- Status badges ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--sf2);
+  color: var(--mu);
+  white-space: nowrap;
+}
+.badge-success,
+.badge-confirmed,
+.badge-valid,
+.badge-published,
+.badge-checked_in { background: var(--ok-soft); color: var(--ok); }
+.badge-danger,
+.badge-cancelled,
+.badge-invalid { background: var(--bad-soft); color: var(--bad); }
+.badge-warning,
+.badge-pending,
+.badge-already_used,
+.badge-used { background: var(--wr-soft); color: var(--wr); }
+.badge-primary { background: var(--ac-soft); color: var(--ac); }
+.badge-secondary,
+.badge-draft { background: var(--sf2); color: var(--mu); }
+
+/* ---------- Lists ---------- */
+.events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.attendees-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0 12px;
+}
+
+/* ---------- Analytics ---------- */
+.analytics-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.analytics-filters .form-select {
+  width: auto;
+  min-width: 180px;
+}
+.analytics-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+@media (min-width: 900px) {
+  .analytics-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.analytics-card {
+  background: var(--sf);
+  border: 1px solid var(--ln);
+  border-radius: var(--r-sm);
+  padding: 20px;
+  min-width: 0;
+}
+.analytics-card h3 {
+  margin-bottom: 16px;
+}
+
+/* Vertical bars */
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 220px;
+  padding-top: 8px;
+  border-bottom: 2px solid var(--ln-strong);
+  overflow-x: auto;
+}
+.chart-bar-group {
+  flex: 1 0 28px;
+  height: 100%;
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  justify-items: center;
+  align-items: end;
+  gap: 4px;
+  min-width: 0;
+}
+.chart-bar {
+  width: 100%;
+  max-width: 44px;
+  min-height: 3px;
+  background: var(--ac);
+  border-radius: 2px 2px 0 0;
+  transition: height var(--e) 0.4s;
+}
+.chart-bar-label {
+  font-size: 11px;
+  color: var(--mu);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chart-bar-value {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Horizontal bars */
+.chart-bars--horizontal {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  height: auto;
+  border-bottom: none;
+  overflow: visible;
+}
+.chart-bars--horizontal .chart-bar-group {
+  display: grid;
+  grid-template-columns: minmax(80px, 30%) 1fr auto;
+  grid-template-rows: auto;
+  align-items: center;
+  justify-items: stretch;
+  gap: 10px;
+  height: auto;
+  flex: none;
+}
+.chart-bars--horizontal .chart-bar-label {
+  font-size: 13px;
+  color: var(--tx);
+}
+.chart-bar-wrapper {
+  height: 14px;
+  background: var(--sf2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.chart-bar--fill {
+  height: 100%;
+  max-width: none;
+  border-radius: 0;
+  background: var(--hi);
+}
+
+/* Big numbers */
+.analytics-metrics {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.metric-value {
+  font-family: var(--font-display);
+  font-stretch: 80%;
+  font-weight: 900;
+  font-size: clamp(44px, 8vw, 68px);
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+}
+.metric-label {
+  font-size: 14px;
+  color: var(--mu);
+}
+
+/* ---------- Manual check-in ---------- */
+.checkin-card {
+  background: var(--sf);
+  border: 1px solid var(--ln);
+  border-radius: var(--r-sm);
+  padding: 20px;
+  max-width: 560px;
+}
+.checkin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.checkin-upload {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 2px dashed var(--ln-strong);
+}
+.checkin-upload-text {
+  color: var(--mu);
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.file-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px dashed var(--ln-strong);
+  border-radius: var(--r);
+  background: var(--bg);
+  font-size: 14px;
+}
+.file-input::file-selector-button {
+  margin-right: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--ln-strong);
+  border-radius: var(--r-sm);
+  background: var(--sf);
+  color: var(--tx);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.checkin-result {
+  margin-top: 24px;
+  max-width: 560px;
+}
+.checkin-result-card {
+  background: var(--ok-soft);
+  border: 1px solid var(--ok);
+  border-left-width: 6px;
+  border-radius: var(--r-sm);
+  padding: 14px 16px;
+}
+.checkin-result-card p {
+  margin: 0 0 4px;
+}
+
+/* Scanner result states, when the page marks them */
+.valid { color: var(--ok); }
+.invalid { color: var(--bad); }
+.already_used { color: var(--wr); }
+
+/* ---------- Page wrappers that do not use .page: keep clear of the mobile tab bar ---------- */
+.page-dashboard,
+.page-admin-analytics,
+.page-admin-attendees,
+.page-admin-checkin,
+.page-events,
+.page-event-details,
+.page-form {
+  padding-top: 28px;
+  padding-bottom: 104px;
+}
+@media (min-width: 1024px) {
+  .page-dashboard,
+  .page-admin-analytics,
+  .page-admin-attendees,
+  .page-admin-checkin,
+  .page-events,
+  .page-event-details,
+  .page-form {
+    padding-bottom: 56px;
+  }
+}
+
+/* ---------- Forms built from .field inside .form ---------- */
+.form .field {
+  margin-bottom: 0;
+}
+.form .form-actions {
+  margin-top: 4px;
+  padding-top: 0;
+  border-top: none;
+}

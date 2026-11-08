@@ -37,23 +37,23 @@
 }
 
 .stat-card--primary .stat-icon {
-  background: rgba(79, 70, 229, 0.1);
+  background: var(--ac-soft);
 }
 
 .stat-card--secondary .stat-icon {
-  background: rgba(14, 165, 233, 0.1);
+  background: var(--ac-soft);
 }
 
 .stat-card--accent .stat-icon {
-  background: rgba(245, 158, 11, 0.1);
+  background: var(--wr-soft);
 }
 
 .stat-card--success .stat-icon {
-  background: rgba(16, 185, 129, 0.1);
+  background: var(--ok-soft);
 }
 
 .stat-card--warning .stat-icon {
-  background: rgba(245, 158, 11, 0.1);
+  background: var(--wr-soft);
 }
 
 .stat-content {
@@ -199,7 +199,7 @@
 }
 
 .badge-primary {
-  background: rgba(79, 70, 229, 0.1);
+  background: var(--ac-soft);
   color: var(--primary);
 }
 

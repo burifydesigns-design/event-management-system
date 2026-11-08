@@ -4,9 +4,9 @@
 
 .event-detail {
   background: var(--surface);
+  border: 1px solid var(--ln);
   border-radius: var(--radius-xl);
   overflow: hidden;
-  box-shadow: var(--shadow-md);
 }
 
 .event-detail-image {
@@ -27,13 +27,12 @@
   position: absolute;
   top: 1rem;
   left: 1rem;
-  background: var(--primary);
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius);
+  background: var(--hi);
+  color: var(--on-hi);
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--r-sm);
   font-size: 0.875rem;
-  font-weight: 600;
-  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .event-detail-content {
@@ -56,9 +55,11 @@
 }
 
 .event-detail-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1.2;
+  font-family: var(--font-display);
+  font-stretch: 80%;
+  font-size: clamp(2rem, 6vw, 3.25rem);
+  font-weight: 900;
+  line-height: 1;
   margin-bottom: 0.5rem;
 }
 
