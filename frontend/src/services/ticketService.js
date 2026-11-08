@@ -5,6 +5,11 @@ export const getMyTickets = async (params = {}) => {
   return data
 }
 
+export const getTicketTypesForEvent = async (eventId) => {
+  const { data } = await api.get(`/tickets/event/${eventId}`)
+  return data
+}
+
 export const getTicket = async (id) => {
   const { data } = await api.get(`/tickets/${id}`)
   return data
@@ -16,12 +21,12 @@ export const getTicketQR = async (id) => {
 }
 
 export const validateTicket = async (qrToken, eventId) => {
-  const { data } = await api.post('/tickets/validate', { qrToken, eventId })
+  const { data } = await api.post('/scan/validate', { qrToken, eventId })
   return data
 }
 
 export const checkInTicket = async (qrToken, eventId) => {
-  const { data } = await api.post('/tickets/check-in', { qrToken, eventId })
+  const { data } = await api.post('/scan', { qrToken, eventId })
   return data
 }
 
