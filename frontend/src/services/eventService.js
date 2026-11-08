@@ -36,7 +36,6 @@ const requestEvents = async (params = {}) => {
     method: 'GET',
     headers: {
       apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
       Accept: 'application/json',
     },
   })
