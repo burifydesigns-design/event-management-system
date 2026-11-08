@@ -168,13 +168,31 @@ alter table public.audit_logs enable row level security;
 
 -- Read-only public venue/session discovery for published events.
 drop policy if exists venues_public_read on public.venues;
-create policy venues_public_read on public.venues for select to anon, authenticated
-using (exists (select 1 from public.events e where e.venue_id = id and e.status = 'published' and e.deleted_at is null)
+drop policy if exists venues_authenticated_read on public.venues;
+create policy venues_public_read on public.venues for select to anon
+using (exists (select 1 from public.events e where e.venue_id = venues.id and e.status = 'published' and e.deleted_at is null));
+create policy venues_authenticated_read on public.venues for select to authenticated
+using (exists (select 1 from public.events e where e.venue_id = venues.id and e.status = 'published' and e.deleted_at is null)
+       or exists (select 1 from public.events e where e.venue_id = venues.id and e.organizer_id = (select auth.uid()))
        or (select private.has_role(array['admin'])));
+drop policy if exists venues_manager_insert on public.venues;
+create policy venues_manager_insert on public.venues for insert to authenticated
+with check (created_by = (select auth.uid()) or (select private.has_role(array['admin'])));
+drop policy if exists venues_manager_update on public.venues;
+create policy venues_manager_update on public.venues for update to authenticated
+using (created_by = (select auth.uid()) or (select private.has_role(array['admin'])))
+with check (created_by = (select auth.uid()) or (select private.has_role(array['admin'])));
+drop policy if exists venues_manager_delete on public.venues;
+create policy venues_manager_delete on public.venues for delete to authenticated
+using (created_by = (select auth.uid()) or (select private.has_role(array['admin'])));
+
 drop policy if exists event_sessions_public_read on public.event_sessions;
-create policy event_sessions_public_read on public.event_sessions for select to anon, authenticated
-using (exists (select 1 from public.events e where e.id = event_id and e.status = 'published' and e.deleted_at is null)
-       or exists (select 1 from public.events e where e.id = event_id and e.organizer_id = (select auth.uid()))
+drop policy if exists event_sessions_authenticated_read on public.event_sessions;
+create policy event_sessions_public_read on public.event_sessions for select to anon
+using (exists (select 1 from public.events e where e.id = event_sessions.event_id and e.status = 'published' and e.deleted_at is null));
+create policy event_sessions_authenticated_read on public.event_sessions for select to authenticated
+using (exists (select 1 from public.events e where e.id = event_sessions.event_id and e.status = 'published' and e.deleted_at is null)
+       or exists (select 1 from public.events e where e.id = event_sessions.event_id and e.organizer_id = (select auth.uid()))
        or (select private.has_role(array['admin'])));
 drop policy if exists event_sessions_manager_write on public.event_sessions;
 create policy event_sessions_manager_write on public.event_sessions for all to authenticated
@@ -222,7 +240,12 @@ begin
 end $$;
 
 -- Remove accidental externally callable SECURITY DEFINER helper flagged by Supabase Advisor.
-revoke all on function public.rls_auto_enable() from public, anon, authenticated;
+do $
+begin
+  if to_regprocedure('public.rls_auto_enable()') is not null then
+    execute 'revoke all on function public.rls_auto_enable() from public, anon, authenticated';
+  end if;
+end $;
 
 -- Explicit Data API grants; RLS above remains the row-level boundary.
 grant select on public.venues, public.event_sessions to anon, authenticated;
