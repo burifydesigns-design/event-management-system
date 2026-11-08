@@ -14,7 +14,6 @@ MongoDB, Mongoose and MongoDB connection strings are not part of the supported a
 
 ## Local development
 
-### Backend
 ```bash
 cd backend
 npm install
