@@ -279,12 +279,12 @@ with check (exists (select 1 from public.events e
                            or (select private.has_role(array['admin'])))));
 
 -- Remove accidental externally callable SECURITY DEFINER helper flagged by Supabase Advisor.
-do $
+do $$
 begin
   if to_regprocedure('public.rls_auto_enable()') is not null then
     execute 'revoke all on function public.rls_auto_enable() from public, anon, authenticated';
   end if;
-end $;
+end $$;
 
 -- Explicit Data API grants; RLS above remains the row-level boundary.
 grant select on public.venues, public.event_sessions to anon, authenticated;
