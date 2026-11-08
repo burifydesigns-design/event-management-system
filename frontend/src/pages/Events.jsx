@@ -88,7 +88,7 @@ export default function Events() {
               const left = (event.capacity || 0) - (event.registeredCount || 0)
               const price = event.price || 0
               return (
-                <button key={event._id || event.id} type="button" className="stub" style={{ '--a': event.colorA || '#c42a55', '--b': event.colorB || '#ffb703' }} onClick={() => navigate(`/events/${event._id || event.id}`)} aria-label={`View ${event.title}`}>
+                <button key={event._id || event.id} type="button" className="stub" style={{ '--a': event.colorA || '#0b6b4f', '--b': event.colorB || '#f2b01e', '--fill': `${Math.min(100, Math.round(((event.registeredCount || 0) / Math.max(1, event.capacity || 1)) * 100))}%` }} onClick={() => navigate(`/events/${event._id || event.id}`)} aria-label={`View ${event.title}`}>
                   <div className="stub__date">
                     <div className="stub__day">{new Date(event.date).getDate()}</div>
                     <div className="stub__month">{new Date(event.date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</div>

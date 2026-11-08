@@ -30,7 +30,7 @@ export default function Login() {
       <div className="container" style={{ maxWidth: 420 }}>
         <div style={{ marginBottom: 24 }}>
           <h1 style={{ fontSize: 34, marginBottom: 6 }}>Welcome back</h1>
-          <p style={{ color: '#625f82', fontSize: 14 }}>Sign in to your account</p>
+          <p style={{ color: 'var(--mu)', fontSize: 14 }}>Sign in to your account</p>
         </div>
         {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
         <form onSubmit={handleSubmit} className="form">

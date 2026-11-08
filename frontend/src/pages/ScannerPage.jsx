@@ -191,7 +191,7 @@ export default function ScannerPage() {
         <div className="viewfinder" role="region" aria-label="Camera viewfinder">
           <video ref={videoRef} autoPlay playsInline className="scanner-video" style={{ display: cameraActive ? 'block' : 'none' }} />
           {!cameraActive && !cameraError && (
-            <div style={{ textAlign: 'center', color: '#a09dc8', padding: 24 }}>
+            <div style={{ textAlign: 'center', color: 'var(--mu)', padding: 24 }}>
               <p style={{ fontSize: 16, marginBottom: 6 }}>Tap Start Camera to begin scanning</p>
               <p style={{ fontSize: 13, opacity: 0.8 }}>Requires HTTPS or localhost and camera permission.</p>
             </div>
@@ -256,13 +256,13 @@ export default function ScannerPage() {
             </div>
             <div className="result__text">{result.title}</div>
             <div className="result__sub">{result.sub}</div>
-            <p style={{ marginTop: 10, fontSize: 13, color: '#a09dc8' }}>Tap to resume scanning</p>
+            <p style={{ marginTop: 10, fontSize: 13, color: 'var(--mu)' }}>Tap to resume scanning</p>
           </div>
         )}
 
         {!cameraActive && !cameraError && !result && (
           <div style={{ textAlign: 'center', marginTop: 10 }}>
-            <p style={{ color: '#a09dc8', fontSize: 13 }}>Scanning pauses automatically after each result.</p>
+            <p style={{ color: 'var(--mu)', fontSize: 13 }}>Scanning pauses automatically after each result.</p>
           </div>
         )}
       </div>

@@ -57,8 +57,8 @@ export default function EventDetails() {
     return <ErrorMessage message={error} />
   }
 
-  const colorA = event.colorA || '#c42a55'
-  const colorB = event.colorB || '#ffb703'
+  const colorA = event.colorA || '#0b6b4f'
+  const colorB = event.colorB || '#f2b01e'
   const eventStyle = { '--a': colorA, '--b': colorB }
 
   return (

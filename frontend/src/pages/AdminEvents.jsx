@@ -66,7 +66,7 @@ export default function AdminEvents() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 16 }}>
           <div>
             <h1>Events</h1>
-            <p style={{ color: '#625f82', fontSize: 14 }}>Manage all events on the platform.</p>
+            <p style={{ color: 'var(--mu)', fontSize: 14 }}>Manage all events on the platform.</p>
           </div>
           <Link to="/create-event" className="btn btn--primary">New event</Link>
         </div>
@@ -77,7 +77,7 @@ export default function AdminEvents() {
         {loading ? (
           <Loading text="Loading events..." />
         ) : events.length === 0 ? (
-          <p style={{ color: '#625f82', textAlign: 'center', padding: 24 }}>No events found.</p>
+          <p style={{ color: 'var(--mu)', textAlign: 'center', padding: 24 }}>No events found.</p>
         ) : (
           <div className="table-wrap">
             <table className="data">
@@ -96,7 +96,7 @@ export default function AdminEvents() {
                   <tr key={event._id}>
                     <td>
                       <div style={{ fontWeight: 600 }}>{event.title}</div>
-                      <div style={{ fontSize: 12, color: '#625f82' }}>{new Date(event.date).toLocaleDateString()}</div>
+                      <div style={{ fontSize: 12, color: 'var(--mu)' }}>{new Date(event.date).toLocaleDateString()}</div>
                     </td>
                     <td>{event.category}</td>
                     <td>{event.city}</td>

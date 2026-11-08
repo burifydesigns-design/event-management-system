@@ -1,52 +1,134 @@
-/* Design tokens — single source of truth. No hardcoded colors elsewhere. */
+/* Design tokens — single source of truth for colour, type, shape and motion.
+   Palette: forest ink + signal green for actions + marigold for highlights.
+   Red is reserved for errors and cancelled/invalid states. */
 :root {
-  --bg: #f4f1fa;
+  /* Surfaces */
+  --bg: #f0f4f1;
   --sf: #ffffff;
-  --sf2: #e9e5f5;
-  --tx: #0d0b2e;
-  --mu: #625f82;
-  --ln: #0d0b2e1f;
-  --ac: #2b3cff;
-  --ok: #0f9d58;
-  --bad: #d62839;
-  --wr: #b86e00;
+  --sf2: #e3ebe6;
+
+  /* Text */
+  --tx: #0e1f1a;
+  --mu: #4f625a;
+
+  /* Lines */
+  --ln: #0e1f1a26;
+  --ln-strong: #0e1f1a59;
+
+  /* Brand */
+  --ac: #0b6b4f;          /* primary action */
+  --ac-strong: #084f3a;   /* hover / pressed */
+  --ac-soft: #0b6b4f1a;   /* tinted backgrounds */
+  --on-ac: #ffffff;       /* text on --ac */
+  --hi: #f2b01e;          /* marigold highlight */
+  --on-hi: #0e1f1a;       /* text on --hi */
+
+  /* Status */
+  --ok: #12804f;
+  --bad: #c0283a;
+  --wr: #9a5b00;
+  --ok-soft: #12804f1a;
+  --bad-soft: #c0283a1a;
+  --wr-soft: #9a5b001f;
+
+  /* Shape */
+  --r-sm: 6px;
+  --r: 10px;
+  --r-lg: 14px;
+  --shadow-1: 0 1px 2px #0e1f1a14, 0 1px 1px #0e1f1a0d;
+  --shadow-2: 0 8px 24px #0e1f1a1f;
+
+  /* Motion */
   --e: cubic-bezier(.2, .8, .2, 1);
-  --font: "Bricolage Grotesque", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+
+  /* Type */
+  --font-display: "Anybody", "Arial Narrow", ui-sans-serif, system-ui, sans-serif;
+  --font: "Instrument Sans", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+
+  /* Legacy aliases — older stylesheets still use these names. Do not use in new code. */
+  --primary: var(--ac);
+  --primary-dark: var(--ac-strong);
+  --primary-light: var(--ac-soft);
+  --secondary: var(--tx);
+  --text: var(--tx);
+  --text-secondary: var(--mu);
+  --text-muted: var(--mu);
+  --border: var(--ln);
+  --border-light: var(--ln);
+  --surface: var(--sf);
+  --background: var(--bg);
+  --radius: var(--r);
+  --radius-lg: var(--r-sm);
+  --radius-xl: var(--r-sm);
+  --shadow: none;
+  --shadow-md: none;
+  --shadow-lg: var(--shadow-1);
+  --danger: var(--bad);
+  --danger-light: var(--bad-soft);
+  --success: var(--ok);
+  --success-light: var(--ok-soft);
+  --warning: var(--wr);
+  --warning-light: var(--wr-soft);
+
   color-scheme: light;
 }
 
 /* Dark theme: via system preference (unless forced light) OR forced dark attribute. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0b0a22;
-    --sf: #16153b;
-    --sf2: #201f4d;
-    --tx: #f1eeff;
-    --mu: #a09dc8;
-    --ln: #f1eeff24;
-    --ac: #5865ff;
+    --bg: #0a1511;
+    --sf: #12221b;
+    --sf2: #1b3128;
+    --tx: #e9f3ee;
+    --mu: #9bb2a7;
+    --ln: #e9f3ee29;
+    --ln-strong: #e9f3ee66;
+    --ac: #3ecf94;
+    --ac-strong: #6fe0b3;
+    --ac-soft: #3ecf9426;
+    --on-ac: #04130d;
+    --ok: #4fd49a;
+    --bad: #ff7d8c;
+    --wr: #f2b01e;
+    --ok-soft: #4fd49a24;
+    --bad-soft: #ff7d8c24;
+    --wr-soft: #f2b01e24;
+    --shadow-1: 0 1px 2px #00000066;
+    --shadow-2: 0 8px 24px #00000080;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0b0a22;
-  --sf: #16153b;
-  --sf2: #201f4d;
-  --tx: #f1eeff;
-  --mu: #a09dc8;
-  --ln: #f1eeff24;
-  --ac: #5865ff;
+  --bg: #0a1511;
+  --sf: #12221b;
+  --sf2: #1b3128;
+  --tx: #e9f3ee;
+  --mu: #9bb2a7;
+  --ln: #e9f3ee29;
+  --ln-strong: #e9f3ee66;
+  --ac: #3ecf94;
+  --ac-strong: #6fe0b3;
+  --ac-soft: #3ecf9426;
+  --on-ac: #04130d;
+  --ok: #4fd49a;
+  --bad: #ff7d8c;
+  --wr: #f2b01e;
+  --ok-soft: #4fd49a24;
+  --bad-soft: #ff7d8c24;
+  --wr-soft: #f2b01e24;
+  --shadow-1: 0 1px 2px #00000066;
+  --shadow-2: 0 8px 24px #00000080;
   color-scheme: dark;
 }
 
-/* Per-event colors are injected inline as --a / --b on the event root element. */
+/* Per-event colours are injected inline as --a / --b on the event root element. */
 
 /* Theme toggle button */
 .theme-toggle {
   position: relative;
   width: 40px;
   height: 40px;
-  border-radius: 50%;
+  border-radius: var(--r);
   border: 1px solid var(--ln);
   background: var(--sf);
   color: var(--tx);
@@ -55,12 +137,10 @@
   place-items: center;
   font-size: 18px;
   line-height: 1;
-  box-shadow: 0 1px 2px var(--ln);
   transition: transform var(--e) 0.2s, border-color var(--e) 0.2s;
 }
-.theme-toggle:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--ac);
+.theme-toggle:hover {
+  border-color: var(--ln-strong);
 }
 .theme-toggle:active {
   transform: scale(0.92);

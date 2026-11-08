@@ -1,6 +1,6 @@
 .page-ticket {
   padding: 1.5rem 0 3rem;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  background: var(--bg);
   min-height: calc(100vh - 200px);
 }
 
@@ -41,7 +41,7 @@
 .ticket-right {
   width: 100%;
   background: var(--primary);
-  color: white;
+  color: var(--on-ac);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -133,7 +133,7 @@
   height: 150px;
   border-radius: var(--radius);
   margin-bottom: 1rem;
-  background: white;
+  background: var(--sf);
   padding: 0.5rem;
 }
 

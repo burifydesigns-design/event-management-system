@@ -165,8 +165,8 @@ export default function AdminDashboard() {
                     datasets: [{
                       label: 'Registrations',
                       data: regTrends.map((d) => d.count),
-                      borderColor: '#4f46e5',
-                      backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                      borderColor: '#0b6b4f',
+                      backgroundColor: 'rgba(11, 107, 79, 0.12)',
                       fill: true,
                       tension: 0.4,
                     }],
@@ -191,8 +191,8 @@ export default function AdminDashboard() {
                     datasets: [{
                       label: 'Check-ins',
                       data: checkInTrends.map((d) => d.count),
-                      borderColor: '#10b981',
-                      backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                      borderColor: '#f2b01e',
+                      backgroundColor: 'rgba(242, 176, 30, 0.18)',
                       fill: true,
                       tension: 0.4,
                     }],
@@ -216,7 +216,7 @@ export default function AdminDashboard() {
                     labels: eventsByCategory.map((e) => e._id),
                     datasets: [{
                       data: eventsByCategory.map((e) => e.count),
-                      backgroundColor: ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
+                      backgroundColor: ['#0b6b4f', '#f2b01e', '#1d3557', '#c0283a', '#5b2a86', '#0a7e8c'],
                     }],
                   }}
                   options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
@@ -239,7 +239,7 @@ export default function AdminDashboard() {
                     datasets: [{
                       label: 'Revenue ($)',
                       data: revTrends.map((d) => d.gross),
-                      backgroundColor: '#4f46e5',
+                      backgroundColor: '#0b6b4f',
                     }],
                   }}
                   options={{ responsive: true, plugins: { legend: { display: false } } }}

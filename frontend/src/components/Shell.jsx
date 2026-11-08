@@ -124,7 +124,7 @@ export default function Shell({ children }) {
             title="Toggle theme"
             data-theme={theme}
           >
-            {theme === 'dark' ? '◐' : '◑'}
+            {theme === 'dark' ? '☀' : '☾'}
           </button>
         </div>
       </header>

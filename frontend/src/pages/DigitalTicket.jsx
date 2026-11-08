@@ -82,7 +82,7 @@ export default function DigitalTicket() {
   if (!registration || !event) {
     return (
       <div className="container">
-        <div style={{ textAlign: 'center', padding: '4rem 2rem', color: '#625f82' }}>
+        <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--mu)' }}>
           <p style={{ fontSize: 36, marginBottom: 8, fontWeight: 800 }}>🎫</p>
           <p style={{ fontSize: 20, fontWeight: 600, marginBottom: 6 }}>Ticket not found</p>
           <p>The ticket you're looking for doesn't exist.</p>
@@ -91,8 +91,8 @@ export default function DigitalTicket() {
     )
   }
 
-  const colorA = event.colorA || '#c42a55'
-  const colorB = event.colorB || '#ffb703'
+  const colorA = event.colorA || '#0b6b4f'
+  const colorB = event.colorB || '#f2b01e'
   const ticketNumber = registration.ticketNumber || ''
   const admits = 1
   const eventStyle = { '--a': colorA, '--b': colorB }

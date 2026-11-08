@@ -87,7 +87,7 @@ export default function AdminUsers() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 16 }}>
           <div>
             <h1>Users</h1>
-            <p style={{ color: '#625f82', fontSize: 14 }}>Platform users and staff accounts.</p>
+            <p style={{ color: 'var(--mu)', fontSize: 14 }}>Platform users and staff accounts.</p>
           </div>
           <button type="button" className="btn btn--primary" onClick={() => setShowCreateForm((s) => !s)}>
             {showCreateForm ? 'Cancel' : 'Create staff account'}
@@ -135,7 +135,7 @@ export default function AdminUsers() {
         {loading ? (
           <Loading text="Loading users..." />
         ) : users.length === 0 ? (
-          <p style={{ color: '#625f82', textAlign: 'center', padding: 24 }}>No users found.</p>
+          <p style={{ color: 'var(--mu)', textAlign: 'center', padding: 24 }}>No users found.</p>
         ) : (
           <div className="table-wrap">
             <table className="data">

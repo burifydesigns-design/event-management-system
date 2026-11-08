@@ -5,8 +5,8 @@
 .form-card {
   background: var(--surface);
   padding: 1.5rem;
+  border: 1px solid var(--ln);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
   width: 100%;
 }
 
@@ -15,8 +15,10 @@
 }
 
 .form-title {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-stretch: 80%;
+  font-size: 2rem;
+  font-weight: 900;
   margin-bottom: 0.5rem;
 }
 
@@ -52,10 +54,11 @@
 .form-select,
 .form-textarea {
   padding: 0.75rem 1rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--ln-strong);
   border-radius: var(--radius);
   font-size: 1rem;
-  background: white;
+  color: var(--tx);
+  background: var(--sf);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   width: 100%;
 }
@@ -64,7 +67,7 @@
 .form-select:focus,
 .form-textarea:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  box-shadow: 0 0 0 3px var(--ac-soft);
 }
 
 .form-textarea {
@@ -98,7 +101,7 @@
   }
 
   .form-title {
-    font-size: 1.875rem;
+    font-size: 2.5rem;
   }
 
   .form-actions {

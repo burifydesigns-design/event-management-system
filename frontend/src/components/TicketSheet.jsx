@@ -27,8 +27,8 @@ export default function TicketSheet({ event, onClose }) {
   const [error, setError] = useState(null)
   const [ticketId, setTicketId] = useState(null)
 
-  const colorA = event.colorA || '#c42a55'
-  const colorB = event.colorB || '#ffb703'
+  const colorA = event.colorA || '#0b6b4f'
+  const colorB = event.colorB || '#f2b01e'
   const eventStyle = { '--a': colorA, '--b': colorB }
 
   const totalQty = Object.values(quantities).reduce((a, b) => a + b, 0)
@@ -100,7 +100,7 @@ export default function TicketSheet({ event, onClose }) {
                   <p className="poster__meta">{fmtDate(event.date)} at {event.location}</p>
                 </div>
               </div>
-              <p style={{ color: '#625f82', fontSize: 13, marginBottom: 14 }}>Pick a tier and set the quantity for each.</p>
+              <p style={{ color: 'var(--mu)', fontSize: 13, marginBottom: 14 }}>Pick a tier and set the quantity for each.</p>
               {TIERS.map((t) => {
                 const price = tierPrice(t)
                 const qty = quantities[t.key] || 0
@@ -125,13 +125,13 @@ export default function TicketSheet({ event, onClose }) {
           {step === 2 && (
             <>
               <h2 style={{ fontSize: 'clamp(26px, 6vw, 34px)', marginBottom: 6 }}>Pay with M-Pesa</h2>
-              <p style={{ color: '#625f82', fontSize: 13, marginBottom: 16 }}>Enter the phone number linked to your M-Pesa account.</p>
+              <p style={{ color: 'var(--mu)', fontSize: 13, marginBottom: 16 }}>Enter the phone number linked to your M-Pesa account.</p>
               <div className="field">
                 <label>Phone number</label>
                 <input className="input" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07XX XXX XXX" />
               </div>
               {error && (
-                <div style={{ background: 'rgba(214,40,57,0.1)', border: '1px solid rgba(214,40,57,0.2)', color: '#d62839', padding: 10, borderRadius: 8, fontSize: 13, marginBottom: 14, marginTop: 8 }}>{error}</div>
+                <div className="alert alert--error" role="alert">{error}</div>
               )}
               <button
                 type="button"
@@ -146,10 +146,10 @@ export default function TicketSheet({ event, onClose }) {
           {step === 3 && (
             <>
               <svg width="96" height="96" viewBox="0 0 24 24" aria-hidden="true" style={{ margin: '0 auto 16px' }}>
-                <path d="M5 12l3 3 7-7" fill="none" stroke="#0f9d58" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ strokeDasharray: '16', strokeDashoffset: '16', animation: 'drawCheck 0.7s cubic-bezier(.2,.8,.2,1) forwards' }} />
+                <path d="M5 12l3 3 7-7" fill="none" stroke="#12804f" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ strokeDasharray: '16', strokeDashoffset: '16', animation: 'drawCheck 0.7s cubic-bezier(.2,.8,.2,1) forwards' }} />
               </svg>
               <h2 style={{ fontSize: 28, marginBottom: 4 }}>You&rsquo;re in</h2>
-              <p style={{ color: '#625f82', fontSize: 15, marginBottom: 20 }}>Your ticket is ready. You can view it anytime from the Ticket tab.</p>
+              <p style={{ color: 'var(--mu)', fontSize: 15, marginBottom: 20 }}>Your ticket is ready. You can view it anytime from the Ticket tab.</p>
               <div className="form-actions">
                 <button type="button" className="btn btn--primary" onClick={handleViewTicket} disabled={loading}>View ticket</button>
                 <button type="button" className="btn btn--ghost" onClick={closeSheet}>Done</button>

@@ -90,6 +90,15 @@ export default function OrganizerDashboard() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  // Dismiss toast after it expires
+  useEffect(() => {
+    if (!toast) return
+    const id = toast.id
+    return () => {
+      if (timers.current[id]) clearTimeout(timers.current[id])
+    }
+  }, [toast])
+
   if (loading) return <Loading text="Loading organizer dashboard..." />
   if (error) return <ErrorMessage message={error} />
 
@@ -147,15 +156,6 @@ export default function OrganizerDashboard() {
     setSuccess('Event restored.')
   }
 
-  // Dismiss toast after it expires
-  useEffect(() => {
-    if (!toast) return
-    const id = toast.id
-    return () => {
-      if (timers.current[id]) clearTimeout(timers.current[id])
-    }
-  }, [toast])
-
   const statusPill = (event) => {
     const s = soldByTitle[String(event.title)]
     const sold = s ? s.sold : 0
@@ -189,7 +189,7 @@ export default function OrganizerDashboard() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 16 }}>
           <div>
             <h1>Overview</h1>
-            <p style={{ color: '#625f82', fontSize: 14 }}>Your events at a glance.</p>
+            <p style={{ color: 'var(--mu)', fontSize: 14 }}>Your events at a glance.</p>
           </div>
           <Link to="/create-event" className="btn btn--primary">New event</Link>
         </div>
@@ -230,7 +230,7 @@ export default function OrganizerDashboard() {
               </thead>
               <tbody>
                 {visibleEvents.length === 0 ? (
-                  <tr><td colSpan={5} style={{ color: '#625f82', textAlign: 'center', padding: 20 }}>No events found.</td></tr>
+                  <tr><td colSpan={5} style={{ color: 'var(--mu)', textAlign: 'center', padding: 20 }}>No events found.</td></tr>
                 ) : (
                   visibleEvents.map((event) => {
                     const id = event._id || event.id
@@ -244,7 +244,7 @@ export default function OrganizerDashboard() {
                       <tr key={id}>
                         <td>
                           <div style={{ fontWeight: 600 }}>{event.title}</div>
-                          <div style={{ fontSize: 12, color: '#625f82' }}>{fmtDate(event.date)}</div>
+                          <div style={{ fontSize: 12, color: 'var(--mu)' }}>{fmtDate(event.date)}</div>
                         </td>
                         <td>{soldText(event)}</td>
                         <td>{pct > 0.9 ? <span className="pill pill--bad">Almost full</span> : <span className="pill pill--ok">On sale</span>}</td>
