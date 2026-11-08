@@ -14,6 +14,21 @@ exports.scanTicket = async (req, res, next) => {
     if (lookupError) throw lookupError;
     if (!ticket) return res.status(404).json({ valid: false, message: 'Ticket not found' });
     if (ticket.event_id !== eventId) return res.status(400).json({ valid: false, message: 'Ticket is for a different event' });
+
+    const { data: event, error: eventError } = await db().from('events')
+      .select('organizer_id').eq('id', eventId).maybeSingle();
+    if (eventError) throw eventError;
+    if (!event) return res.status(404).json({ valid: false, message: 'Event not found' });
+    if (req.user.role === 'organizer' && event.organizer_id !== req.user.userId) {
+      return res.status(403).json({ valid: false, message: 'You are not assigned to this event' });
+    }
+    if (req.user.role === 'coordinator') {
+      const { data: membership, error: membershipError } = await db().from('organizer_members')
+        .select('id').eq('organizer_id', event.organizer_id).eq('member_id', req.user.userId)
+        .in('role', ['owner', 'manager', 'check_in']).maybeSingle();
+      if (membershipError) throw membershipError;
+      if (!membership) return res.status(403).json({ valid: false, message: 'You are not assigned to this event' });
+    }
     if (ticket.status !== 'valid') {
       return res.status(409).json({ valid: false, message: ticket.status === 'used' ? 'Ticket already used' : 'Ticket is void' });
     }
