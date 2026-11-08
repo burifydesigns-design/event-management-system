@@ -223,3 +223,10 @@ end $$;
 
 -- Remove accidental externally callable SECURITY DEFINER helper flagged by Supabase Advisor.
 revoke all on function public.rls_auto_enable() from public, anon, authenticated;
+
+-- Explicit Data API grants; RLS above remains the row-level boundary.
+grant select on public.venues, public.event_sessions to anon, authenticated;
+grant insert, update, delete on public.venues, public.event_sessions to authenticated;
+grant select, insert, update, delete on public.organizer_members to authenticated;
+grant select on public.order_items to authenticated;
+grant select on public.audit_logs to authenticated;
