@@ -67,7 +67,7 @@ export default function TicketSheet({ event, onClose }) {
               <p style={{ color: 'var(--mu)', lineHeight: 1.6 }}>
                 Your order has been recorded, but payment has not been connected or verified. No ticket has been issued and you are not yet registered as paid.
               </p>
-              <p><strong>Order:</strong> {order.order?.id || order.order?.id || 'Created'}</p>
+              <p><strong>Order:</strong> {order.order?.id || 'Created'}</p>
               <p><strong>Amount:</strong> {order.payment?.currency || 'KES'} {Number(order.payment?.amount || total).toLocaleString()}</p>
               <p><strong>Status:</strong> {order.payment?.status || 'pending'}</p>
               <button type="button" className="btn btn--primary" onClick={close} style={{ marginTop: 16 }}>Close</button>
@@ -104,7 +104,6 @@ export default function TicketSheet({ event, onClose }) {
               </p>
             </>
           )}
-          {error && !order && <div className="alert alert--error" role="alert">{error}</div>}
         </div>
       </div>
     </div>
