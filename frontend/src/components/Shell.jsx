@@ -73,10 +73,21 @@ export default function Shell({ children }) {
 
   const activeKey = (() => {
     const byPath = { '/events': 'discover', '/my-events': 'ticket', '/scanner': 'scan', '/dashboard/organizer': 'organizer' }
+    if (location.pathname.startsWith('/events')) return 'discover'
+    if (location.pathname.startsWith('/my-events') || location.pathname.startsWith('/my-ticket')) return 'ticket'
+    if (location.pathname.startsWith('/scanner')) return 'scan'
+    if (location.pathname.startsWith('/dashboard/organizer')) return 'organizer'
     return byPath[location.pathname] || null
   })()
 
   const isCoordinator = role === 'coordinator'
+  const dashboardPath = role === 'admin'
+    ? '/dashboard/admin'
+    : role === 'organizer'
+      ? '/dashboard/organizer'
+      : role === 'coordinator'
+        ? '/dashboard/coordinator'
+        : '/dashboard/attendee'
 
   return (
     <div className="shell">
@@ -85,16 +96,25 @@ export default function Shell({ children }) {
           EventEase
         </Link>
         <div className="shell__actions">
-          {user && (
-            <button
-              type="button"
-              onClick={logout}
-              className="btn btn--ghost"
-              aria-label="Log out"
-              title="Log out"
-            >
-              Log out
-            </button>
+          {user ? (
+            <>
+              <Link to={dashboardPath} className="btn btn--ghost shell__account-link">Dashboard</Link>
+              <Link to="/profile" className="btn btn--ghost shell__account-link">Profile</Link>
+              <button
+                type="button"
+                onClick={logout}
+                className="btn btn--ghost shell__logout"
+                aria-label="Log out"
+                title="Log out"
+              >
+                Log out
+              </button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" className="btn btn--ghost shell__account-link">Log in</Link>
+              <Link to="/register" className="btn btn--primary shell__account-link">Create account</Link>
+            </>
           )}
           <button
             type="button"

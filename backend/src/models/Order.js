@@ -1,13 +1,20 @@
-const mongoose = require('mongoose');
+const { getSupabase } = require('../config/db');
 
-const orderSchema = new mongoose.Schema(
-  {
-    attendee: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    event: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true },
-    totalAmount: { type: Number, required: true },
-    status: { type: String, enum: ['pending', 'paid', 'failed'], default: 'pending' },
+module.exports = {
+  async create(data) {
+    const payload = {
+      attendee_id: data.attendee || data.attendee_id,
+      event_id: data.event || data.event_id,
+      total_amount: data.totalAmount ?? data.total_amount ?? 0,
+      status: data.status || 'pending',
+    };
+    const { data: row, error } = await getSupabase().from('orders').insert(payload).select('*').single();
+    if (error) throw error;
+    return row;
   },
-  { timestamps: true }
-);
-
-module.exports = mongoose.model('Order', orderSchema);
+  async findById(id) {
+    const { data, error } = await getSupabase().from('orders').select('*').eq('id', id).maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+};
