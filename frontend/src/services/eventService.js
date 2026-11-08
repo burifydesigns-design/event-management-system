@@ -22,6 +22,7 @@ const requestEvents = async (params = {}) => {
   const query = new URLSearchParams({
     select: '*',
     status: 'eq.published',
+    deleted_at: 'is.null',
     order: 'event_date.asc',
     limit: '1000',
   })
@@ -70,6 +71,7 @@ export const getEvent = async (id) => {
     select: '*',
     id: `eq.${id}`,
     status: 'eq.published',
+    deleted_at: 'is.null',
     limit: '1',
   })
   const response = await fetch(`${SUPABASE_URL}/rest/v1/events?${query.toString()}`, {
