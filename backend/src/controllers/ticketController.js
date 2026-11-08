@@ -30,6 +30,10 @@ exports.createTicketType = async (req, res, next) => {
 
 exports.listTicketTypesForEvent = async (req, res, next) => {
   try {
+    const { data: event, error: eventError } = await db().from('events').select('id,status,deleted_at')
+      .eq('id', req.params.eventId).maybeSingle();
+    if (eventError) throw eventError;
+    if (!event || event.status !== 'published' || event.deleted_at) return res.status(404).json({ message: 'Published event not found' });
     const { data, error } = await db().from('ticket_types').select('id,event_id,name,price,quantity_available,quantity_sold')
       .eq('event_id', req.params.eventId).order('price', { ascending: true });
     if (error) throw error;
