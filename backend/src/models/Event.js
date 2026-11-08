@@ -1,25 +1,46 @@
-const mongoose = require('mongoose');
+const { getSupabase } = require('../config/db');
 
-const eventSchema = new mongoose.Schema(
-  {
-    title: { type: String, required: true, trim: true },
-    description: { type: String, required: true, trim: true },
-    category: { type: String, required: true, trim: true },
-    date: { type: Date, required: true },
-    time: { type: String, required: true },
-    location: { type: String, required: true, trim: true },
-    city: { type: String, required: true, trim: true },
-    capacity: { type: Number, required: true, min: 1 },
-    price: { type: Number, default: 0, min: 0 },
-    image: { type: String, default: "" },
-    organizer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    status: {
-      type: String,
-      enum: ['draft', 'published'],
-      default: 'draft',
-    },
+function shape(row) {
+  if (!row) return row;
+  return { ...row, date: row.event_date ?? row.date, time: row.event_time ?? row.time };
+}
+
+function toDb(data = {}) {
+  const out = { ...data };
+  if (out.date !== undefined && out.event_date === undefined) out.event_date = out.date;
+  if (out.time !== undefined && out.event_time === undefined) out.event_time = out.time;
+  delete out.date;
+  delete out.time;
+  if (out.organizer !== undefined && out.organizer_id === undefined) out.organizer_id = out.organizer;
+  delete out.organizer;
+  return out;
+}
+
+module.exports = {
+  _shape: shape,
+  async find(filter = {}) {
+    let q = getSupabase().from('events').select('*').order('event_date', { ascending: true });
+    if (filter && filter.status) q = q.eq('status', filter.status);
+    if (filter && filter.organizer) q = q.eq('organizer_id', filter.organizer);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data || []).map(shape);
   },
-  { timestamps: true }
-);
-
-module.exports = mongoose.model('Event', eventSchema);
+  async findById(id) {
+    const { data, error } = await getSupabase().from('events').select('*').eq('id', id).maybeSingle();
+    if (error) throw error;
+    return shape(data);
+  },
+  async create(data) {
+    const { data: row, error } = await getSupabase().from('events').insert(toDb(data)).select('*').single();
+    if (error) throw error;
+    return shape(row);
+  },
+  async countDocuments(filter = {}) {
+    let q = getSupabase().from('events').select('id', { count: 'exact', head: true });
+    if (filter && filter.status) q = q.eq('status', filter.status);
+    const { count, error } = await q;
+    if (error) throw error;
+    return count || 0;
+  },
+};

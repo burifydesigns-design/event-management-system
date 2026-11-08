@@ -1,13 +1,4 @@
 @import './tokens.css';
 @import './base.css';
 @import './components.css';
-@import './forms.css';
-@import './auth.css';
-@import './home.css';
-@import './events.css';
-@import './event-details.css';
-@import './ticket.css';
-@import './dashboard.css';
-@import './admin.css';
-@import './extras.css';
-@import './responsive.css';
+@import './redesign.css';
