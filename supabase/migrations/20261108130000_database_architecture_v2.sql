@@ -195,18 +195,29 @@ using (exists (select 1 from public.events e where e.id = event_sessions.event_i
        or exists (select 1 from public.events e where e.id = event_sessions.event_id and e.organizer_id = (select auth.uid()))
        or (select private.has_role(array['admin'])));
 drop policy if exists event_sessions_manager_write on public.event_sessions;
-create policy event_sessions_manager_write on public.event_sessions for all to authenticated
-using (exists (select 1 from public.events e where e.id = event_id and (e.organizer_id = (select auth.uid()) or (select private.has_role(array['admin'])))))
-with check (exists (select 1 from public.events e where e.id = event_id and (e.organizer_id = (select auth.uid()) or (select private.has_role(array['admin'])))));
+drop policy if exists event_sessions_manager_insert on public.event_sessions;
+drop policy if exists event_sessions_manager_update on public.event_sessions;
+drop policy if exists event_sessions_manager_delete on public.event_sessions;
+create policy event_sessions_manager_insert on public.event_sessions for insert to authenticated
+with check (exists (select 1 from public.events e where e.id = event_sessions.event_id and (e.organizer_id = (select auth.uid()) or (select private.has_role(array['admin'])))));
+create policy event_sessions_manager_update on public.event_sessions for update to authenticated
+using (exists (select 1 from public.events e where e.id = event_sessions.event_id and (e.organizer_id = (select auth.uid()) or (select private.has_role(array['admin'])))))
+with check (exists (select 1 from public.events e where e.id = event_sessions.event_id and (e.organizer_id = (select auth.uid()) or (select private.has_role(array['admin'])))));
+create policy event_sessions_manager_delete on public.event_sessions for delete to authenticated
+using (exists (select 1 from public.events e where e.id = event_sessions.event_id and (e.organizer_id = (select auth.uid()) or (select private.has_role(array['admin'])))));
 
 -- Membership records are visible only to their organizer or admins.
 drop policy if exists organizer_members_read on public.organizer_members;
 create policy organizer_members_read on public.organizer_members for select to authenticated
 using (organizer_id = (select auth.uid()) or member_id = (select auth.uid()) or (select private.has_role(array['admin'])));
 drop policy if exists organizer_members_admin_manage on public.organizer_members;
-create policy organizer_members_admin_manage on public.organizer_members for all to authenticated
+create policy organizer_members_insert on public.organizer_members for insert to authenticated
+with check (organizer_id = (select auth.uid()) or (select private.has_role(array['admin'])));
+create policy organizer_members_update on public.organizer_members for update to authenticated
 using (organizer_id = (select auth.uid()) or (select private.has_role(array['admin'])))
 with check (organizer_id = (select auth.uid()) or (select private.has_role(array['admin'])));
+create policy organizer_members_delete on public.organizer_members for delete to authenticated
+using (organizer_id = (select auth.uid()) or (select private.has_role(array['admin'])));
 
 -- Order items are visible to the order owner and admins; no client-side price mutation.
 drop policy if exists order_items_read_owner on public.order_items;
@@ -255,12 +266,17 @@ using (exists (select 1 from public.events e
               where e.id = ticket_types.event_id
                 and e.status = 'published' and e.deleted_at is null));
 drop policy if exists ticket_types_authenticated_read_published_or_manager on public.ticket_types;
-create policy ticket_types_authenticated_read_published_or_manager on public.ticket_types for select to authenticated
+drop policy if exists ticket_types_manage_event_owner on public.ticket_types;
+create policy ticket_types_authenticated_access on public.ticket_types for all to authenticated
 using (exists (select 1 from public.events e
               where e.id = ticket_types.event_id
                 and ((e.status = 'published' and e.deleted_at is null)
                      or e.organizer_id = (select auth.uid())
-                     or (select private.has_role(array['admin']))));
+                     or (select private.has_role(array['admin'])))))
+with check (exists (select 1 from public.events e
+                    where e.id = ticket_types.event_id
+                      and (e.organizer_id = (select auth.uid())
+                           or (select private.has_role(array['admin'])))));
 
 -- Remove accidental externally callable SECURITY DEFINER helper flagged by Supabase Advisor.
 do $
