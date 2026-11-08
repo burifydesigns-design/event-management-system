@@ -1,128 +1,91 @@
 # Event Management System
 
-Ticketing platform with four roles: Attendee, Coordinator, Organizer, Admin.
+A Supabase-backed event discovery, registration and ticketing platform with Attendee, Coordinator, Organizer and Admin roles.
+
+## Architecture
+
+- **Frontend:** React, Vite, React Router and Axios.
+- **Backend:** Node.js and Express.
+- **Database and authentication:** Supabase Postgres, Supabase Auth and Row Level Security.
+- **Hosting:** Vercel only.
+- **Ticket QR codes:** server-generated QR tokens and images.
+- **Email:** Nodemailer with SMTP configuration.
+
+MongoDB, Mongoose, MongoDB Atlas and MongoDB-specific test infrastructure are not part of the target architecture. Supabase is the sole application database and authentication provider.
 
 ## Features
 
-- **Attendee** — browse events, register, purchase tickets, receive QR-coded tickets by email, view own tickets.
-- **Coordinator** — mobile-friendly QR ticket scanner for assigned events, check-in history, event-specific attendee lookup.
-- **Organizer** — create/manage events and ticket types, view attendee lists, assign coordinators, live check-in analytics, revenue and sales charts.
-- **Admin** — platform-wide administration, user and role management, event approval, audit analytics, CSV exports.
+- Attendees browse published events, register and access their tickets.
+- Organizers create and manage events and ticket types.
+- Coordinators validate tickets at event check-in.
+- Administrators manage users, events, reporting and exports.
+- Event sessions, reusable venues, organizer memberships, order items, payments, refunds and audit records are defined in the database architecture migration.
 
-## QR Ticket System
+## Repository structure
 
-1. Attendee registers/purchases a ticket → server creates a `Registration` with a cryptographically secure `qrToken`.
-2. Ticket email is sent automatically with a professionally designed HTML ticket containing the QR code.
-3. Authorized staff scan the QR at the venue using the mobile-friendly scanner.
-4. Backend validates the ticket atomically (prevents double check-in) and records the check-in with staff member and timestamp.
-5. Analytics dashboards refresh with live check-in and sales data.
+- `backend/` — Express API, Supabase access, auth middleware, controllers and routes.
+- `frontend/` — React/Vite application.
+- `supabase/migrations/` — versioned Postgres schema and policy migrations.
 
-## Stack
-- Frontend: React (Vite), React Router, Axios, Chart.js (react-chartjs-2)
-- Backend: Node.js, Express, MongoDB (Mongoose)
-- Auth: JWT (bearer token, stored in localStorage)
-- Password hashing: bcryptjs
-- Email: Nodemailer (configurable SMTP) with retry and delivery tracking
-- QR codes: qrcode library (server-side generation)
-- Charts: Chart.js via react-chartjs-2
-- Tests: Jest + Supertest + mongodb-memory-server
+## Local development
 
-## Roles
-- **Attendee** — signs up, browses events, registers, views own tickets/QR codes.
-- **Coordinator** — account created by admin; scans attendee QR codes for assigned events only; views check-in history.
-- **Organizer** — creates/edits/publishes/deletes own events, views attendees, checks in attendees, assigns coordinators, event analytics.
-- **Admin** — full privileges, including user management, platform analytics, CSV exports.
+Install dependencies from the repository root:
 
-## Project structure
-```
-backend/            Node.js/Express API
-  src/
-    config/         DB connection, env config
-    controllers/    Route handlers (thin)
-    middleware/     auth, roles, validation, error handling
-    models/         Mongoose models (User, Event, Registration, TicketInstance, TicketType, Order, CoordinatorAssignment, TicketEmailLog, CheckInLog)
-    routes/         Express routers
-    services/       email, QR, payment, ticket issuance
-    utils/          pagination, CSV export
-  tests/            Jest tests
-  server.js         Entry point
-frontend/           React Vite app
-  src/
-    components/, context/, pages/, services/, styles/
+```bash
+npm install
 ```
 
-## Getting started
+Configure backend environment variables in `backend/.env` and frontend variables in `frontend/.env`. Never commit environment files or credentials.
+
+Start the backend:
+
+```bash
+npm run dev --workspace backend
+```
+
+Start the frontend:
+
+```bash
+npm run dev --workspace frontend
+```
+
+Build the frontend:
+
+```bash
+npm run build --workspace frontend
+```
+
+Run backend tests:
+
+```bash
+npm test --workspace backend
+```
+
+## Environment configuration
 
 ### Backend
-```bash
-cd backend
-npm install
-cp .env.example .env   # fill in your values (see Configuration below)
-npm run dev            # nodemon, http://localhost:5000
-npm test               # Jest test suite
-```
+
+- `SUPABASE_URL` — Supabase project URL.
+- `SUPABASE_SERVICE_ROLE_KEY` — server-only Supabase service role key. Never expose this to the browser.
+- `SUPABASE_ANON_KEY` — legacy anon key if required by the server auth client; use the project publishable key where supported.
+- `FRONTEND_URL` — allowed Vercel frontend origin(s).
+- `PORT` — API port.
+- SMTP variables — required only when email delivery is enabled.
 
 ### Frontend
-```bash
-cd frontend
-npm install
-npm run dev            # Vite dev server, http://localhost:3000
-npm run build          # production build
-npm run lint           # ESLint
-```
-The Vite dev server proxies `/api` requests to `http://localhost:5000` (see `frontend/vite.config.js`).
 
-## Configuration
+- `VITE_SUPABASE_URL` — Supabase project URL.
+- `VITE_SUPABASE_PUBLISHABLE_KEY` — Supabase publishable key.
+- `VITE_API_URL` — deployed API base URL.
 
-### Backend (`.env`)
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `PORT` | Backend port | `5000` |
-| `MONGO_URI` | MongoDB connection string (Atlas or local) | `mongodb+srv://...` |
-| `JWT_SECRET` | Secret used to sign JWTs | strong random string |
-| `JWT_EXPIRES_IN` | JWT expiration | `7d` |
-| `FRONTEND_URL` | Allowed CORS origin (production) | `https://app.example.com` |
-| `SMTP_HOST` | SMTP host | `smtp.example.com` |
-| `SMTP_PORT` | SMTP port | `587` |
-| `SMTP_USER` | SMTP username | — |
-| `SMTP_PASS` | SMTP password | — |
-| `EMAIL_FROM` | From address | `no-reply@example.com` |
-| `SUPPORT_EMAIL` | Support contact on ticket emails | `support@example.com` |
-| `NODE_ENV` | `development` or `production` | `development` |
+Only public/publishable Supabase credentials may be included in Vite variables. Never place service-role keys, database passwords or provider secrets in frontend environment variables.
 
-Never commit real `.env` files or secrets. `.env` is gitignored. Required variables (`MONGO_URI`, `JWT_SECRET`) are validated at startup.
+## Database
 
-### Frontend (`frontend/.env`)
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `VITE_API_URL` | Backend base URL | `http://localhost:5000/api` |
+Apply migrations to a dedicated staging Supabase project first. Validate schema, foreign keys, triggers, grants, RLS policies and application workflows before applying them to production. Do not run the architecture migration against production until staging verification and explicit rollout approval are complete.
 
-## Available scripts
-
-Backend (`backend/package.json`):
-- `npm start` — production server
-- `npm run dev` — nodemon dev server
-- `npm test` — Jest tests
-
-Frontend (`frontend/package.json`):
-- `npm run dev` — Vite dev server
-- `npm run build` — production build
-- `npm run preview` — preview production build
-- `npm run lint` — ESLint
-
-## Scanner Requirements
-
-The QR scanner uses the device camera via `navigator.mediaDevices.getUserMedia`.
-- **HTTPS required** in production (camera access is restricted to secure contexts).
-- `localhost` is exempt from the HTTPS requirement for development.
-- Camera permission must be granted by the user.
-- A fallback manual ticket-reference entry is provided when the camera is unavailable.
+The current production database contains no event records. Existing legacy MongoDB data has not been imported; a source export is required before any historical data migration can be performed.
 
 ## Deployment
-- Frontend: build (`npm run build`) and deploy `frontend/dist` to Vercel. Set `VITE_API_URL` to the production backend URL.
-- Backend: deploy `backend/` to Render or Railway. Set all `.env` variables, including `FRONTEND_URL` to the Vercel origin and `MONGO_URI` to MongoDB Atlas.
-- Use MongoDB Atlas for the database. Enable TLS and restrict network access.
-- In production, set `NODE_ENV=production` so generic error responses are returned and stack traces are hidden.
 
-## API documentation
-See `docs/API.md` for the full endpoint contract (auth, events, registrations, tickets, admin, analytics, system).
+Deploy the frontend and backend exclusively through Vercel. Configure the Vercel project with the appropriate root/build settings and environment variables. Netlify is not an approved hosting or preview provider for this repository.
