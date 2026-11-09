@@ -1,96 +1,103 @@
-import api from './api'
-import { supabase, isSupabaseConfigured } from './supabase'
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 
-// ---- Public reads go straight to Supabase (row-level security allows anon to read
-// published events). Falls back to the API when Supabase is not configured.
-
-const EVENT_COLUMNS = '*, ticket_types(id, name, price, quantity_available, quantity_sold)'
-
-// Turn a database row into the shape the pages expect.
-const toEvent = (row) => {
-  if (!row) return row
-  const { ticket_types: tiers = [], event_date, event_time, ...rest } = row
-  const sold = tiers.reduce((sum, t) => sum + (t.quantity_sold || 0), 0)
-  return {
-    ...rest,
-    _id: row.id,
-    date: event_date,
-    time: event_time,
-    price: Number(row.price) || 0,
-    registeredCount: sold,
-    ticketTypes: tiers.map((t) => ({
-      _id: t.id,
-      id: t.id,
-      name: t.name,
-      price: Number(t.price) || 0,
-      quantity: t.quantity_available,
-      sold: t.quantity_sold,
-    })),
+const requireSupabaseConfig = () => {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    throw new Error('Events are temporarily unavailable because the Supabase connection is not configured.')
   }
 }
 
-// Strip characters that would break out of a PostgREST filter expression.
-const cleanTerm = (value) => String(value).replace(/[,()%*\\]/g, ' ').trim()
+const normalizeEvent = (event) => ({
+  ...event,
+  id: event.id,
+  _id: event.id,
+  date: event.event_date,
+  time: event.event_time,
+  registeredCount: event.registered_count ?? 0,
+})
+
+const requestEvents = async (params = {}) => {
+  requireSupabaseConfig()
+
+  const query = new URLSearchParams({
+    select: '*',
+    status: 'eq.published',
+    deleted_at: 'is.null',
+    order: 'event_date.asc',
+    limit: '1000',
+  })
+
+  if (params.category) query.set('category', `eq.${params.category}`)
+  if (params.date === 'upcoming') query.set('event_date', `gte.${new Date().toISOString()}`)
+  if (params.date === 'past') query.set('event_date', `lt.${new Date().toISOString()}`)
+  if (params.price === 'free') query.set('price', 'eq.0')
+  if (params.price === 'paid') query.set('price', 'gt.0')
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/events?${query.toString()}`, {
+    method: 'GET',
+    headers: {
+      apikey: SUPABASE_KEY,
+      Accept: 'application/json',
+    },
+  })
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    throw new Error(`Unable to load events (${response.status}): ${detail || response.statusText}`)
+  }
+
+  const rows = await response.json()
+  if (!Array.isArray(rows)) throw new Error('The events service returned an unexpected response.')
+  return rows.map(normalizeEvent)
+}
 
 export const getEvents = async (params = {}) => {
-  if (!isSupabaseConfigured) {
-    const { data } = await api.get('/events', { params })
-    return data
+  let events = await requestEvents(params)
+
+  if (params.search) {
+    const term = params.search.trim().toLocaleLowerCase()
+    events = events.filter((event) =>
+      [event.title, event.description, event.city, event.location, event.category]
+        .some((value) => String(value || '').toLocaleLowerCase().includes(term))
+    )
   }
 
-  const { search, category, city, date, price } = params
-  const page = Math.max(1, Number(params.page) || 1)
-  const limit = Math.min(100, Math.max(1, Number(params.limit) || 12))
-  const now = new Date().toISOString()
-
-  let query = supabase
-    .from('events')
-    .select(EVENT_COLUMNS, { count: 'exact' })
-    .eq('status', 'published')
-
-  const term = search ? cleanTerm(search) : ''
-  if (term) query = query.or(`title.ilike.%${term}%,description.ilike.%${term}%,city.ilike.%${term}%`)
-  if (category) query = query.eq('category', category)
-  if (city) query = query.ilike('city', `%${cleanTerm(city)}%`)
-  if (date === 'upcoming') query = query.gte('event_date', now)
-  if (date === 'past') query = query.lt('event_date', now)
-  if (price === 'free') query = query.eq('price', 0)
-  if (price === 'paid') query = query.gt('price', 0)
-
-  const { data, error, count } = await query
-    .order('event_date', { ascending: true })
-    .range((page - 1) * limit, page * limit - 1)
-  if (error) throw error
-
-  const total = count || 0
-  return {
-    events: (data || []).map(toEvent),
-    page,
-    limit,
-    totalEvents: total,
-    totalPages: Math.ceil(total / limit),
-  }
+  return { events, totalEvents: events.length, page: 1, totalPages: events.length ? 1 : 0 }
 }
 
 export const getEvent = async (id) => {
-  if (!isSupabaseConfigured) {
-    const { data } = await api.get(`/events/${id}`)
-    return data
+  requireSupabaseConfig()
+  const query = new URLSearchParams({
+    select: '*',
+    id: `eq.${id}`,
+    status: 'eq.published',
+    deleted_at: 'is.null',
+    limit: '1',
+  })
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/events?${query.toString()}`, {
+    method: 'GET',
+    headers: {
+      apikey: SUPABASE_KEY,
+      Accept: 'application/json',
+    },
+  })
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    throw new Error(`Unable to load this event (${response.status}): ${detail || response.statusText}`)
   }
 
-  const { data, error } = await supabase
-    .from('events')
-    .select(EVENT_COLUMNS)
-    .eq('id', id)
-    .maybeSingle()
-  if (error) throw error
-  if (!data) {
-    const notFound = new Error('Event not found')
-    notFound.response = { status: 404, data: { message: 'Event not found' } }
-    throw notFound
+  const rows = await response.json()
+  if (!Array.isArray(rows) || rows.length === 0) {
+    const error = new Error('Event not found')
+    error.status = 404
+    throw error
   }
-  return toEvent(data)
+  return normalizeEvent(rows[0])
 }
+
+// Event creation and management remain on the authenticated backend API.
+import api from './api'
 
 export const createEvent = async (eventData) => {
   const { data } = await api.post('/events', eventData)
