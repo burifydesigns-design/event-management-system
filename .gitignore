@@ -6,4 +6,7 @@ node_modules/
 *.log
 dist/
 build/
+
+.env.local
+.env.*.local
 .vercel
