@@ -62,7 +62,12 @@ exports.getEventAttendees = async (req, res, next) => {
       .eq('event_id', eventId).order('registered_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1);
     if (error) throw error;
-    res.json({ attendees: data || [], page, limit, total: count || 0, totalPages: Math.ceil((count || 0) / limit) });
+    res.set('X-Total-Count', String(count || 0));
+    res.set('X-Page', String(page));
+    res.set('X-Page-Limit', String(limit));
+    res.set('X-Total-Pages', String(Math.ceil((count || 0) / limit)));
+    // Keep the legacy array response so the existing dashboard remains compatible.
+    res.json(data || []);
   } catch (err) { next(err); }
 };
 
