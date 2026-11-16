@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Loading from '../components/Loading'
@@ -16,7 +16,8 @@ function fmtTime(iso) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-// Client-side QR fallback (SVG, no image) using qrcode-generator 1.4.4 from cdnjs.
+// QR SVG is generated locally by qrcode-generator. Render it as an image URL,
+// never as HTML, so generated markup cannot become an HTML injection sink.
 function makeQRSvg(text) {
   if (typeof window === 'undefined' || !window.qrcode) return null
   try {
@@ -27,6 +28,10 @@ function makeQRSvg(text) {
   } catch {
     return null
   }
+}
+
+function toSvgDataUrl(svg) {
+  return svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` : null
 }
 
 export default function DigitalTicket() {
@@ -50,10 +55,9 @@ export default function DigitalTicket() {
           const eventData = await getEvent(regData.event._id)
           setEvent(eventData)
         }
-        // Existing QR generation endpoint; falls back to client-side SVG if unavailable.
         try {
           const { data } = await getTicketQR(registrationId)
-          if (data.qrCode) {
+          if (typeof data.qrCode === 'string' && data.qrCode.startsWith('data:image/')) {
             setQrUrl(data.qrCode)
           } else {
             setQrSvg(makeQRSvg(regData.ticketNumber || registrationId))
@@ -61,7 +65,7 @@ export default function DigitalTicket() {
         } catch {
           setQrSvg(makeQRSvg(regData.ticketNumber || registrationId))
         }
-      } catch (err) {
+      } catch {
         setError('Unable to load ticket. Please try again.')
       } finally {
         setLoading(false)
@@ -94,13 +98,13 @@ export default function DigitalTicket() {
   const colorA = event.colorA || '#0b6b4f'
   const colorB = event.colorB || '#f2b01e'
   const ticketNumber = registration.ticketNumber || ''
-  const admits = 1
   const eventStyle = { '--a': colorA, '--b': colorB }
+  const generatedQrUrl = toSvgDataUrl(qrSvg)
   const qrContent = qrUrl ? (
     <img src={qrUrl} alt="QR code" className="qr-img" />
-  ) : (
-    <span dangerouslySetInnerHTML={{ __html: qrSvg || '' }} />
-  )
+  ) : generatedQrUrl ? (
+    <img src={generatedQrUrl} alt="QR code" className="qr-img" />
+  ) : null
 
   return (
     <div className="page page--ticket">
