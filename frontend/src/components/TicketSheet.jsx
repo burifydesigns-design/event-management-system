@@ -36,7 +36,7 @@ export default function TicketSheet({ event, onClose }) {
   }, [eventId])
 
   const selectedType = ticketTypes.find((item) => item.id === selectedTypeId)
-  const available = selectedType ? Math.max(0, selectedType.quantity_available - selectedType.quantity_sold) : 0
+  const available = selectedType ? Math.max(0, selectedType.quantity_available - selectedType.quantity_sold - (selectedType.quantity_reserved || 0)) : 0
   const total = useMemo(() => Number(selectedType?.price || 0) * quantity, [selectedType, quantity])
 
   const submitOrder = async () => {
@@ -108,7 +108,7 @@ export default function TicketSheet({ event, onClose }) {
                 <select id="ticket-type" className="input" value={selectedTypeId} onChange={(e) => setSelectedTypeId(e.target.value)}>
                   {ticketTypes.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.name} — KES {Number(item.price).toLocaleString()} ({Math.max(0, item.quantity_available - item.quantity_sold)} available)
+                      {item.name} — KES {Number(item.price).toLocaleString()} ({Math.max(0, item.quantity_available - item.quantity_sold - (item.quantity_reserved || 0))} available)
                     </option>
                   ))}
                 </select>
