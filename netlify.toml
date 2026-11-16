@@ -1,0 +1,4 @@
+# Vercel is the sole supported hosting platform for this repository.
+# Keep the legacy Netlify Git integration from creating new preview or production builds.
+[build]
+  ignore = "exit 0"
