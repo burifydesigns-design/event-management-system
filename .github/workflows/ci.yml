@@ -1,0 +1,25 @@
+name: CI
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, "feat/**"]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install workspace dependencies
+        run: npm install --no-audit --no-fund
+      - name: Backend tests
+        run: npm run test --workspace=backend -- --passWithNoTests
+      - name: Frontend lint
+        run: npm run lint --workspace=frontend
+      - name: Frontend production build
+        run: npm run build --workspace=frontend
