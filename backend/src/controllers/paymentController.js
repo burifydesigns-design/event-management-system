@@ -29,12 +29,29 @@ exports.initiateMpesaPayment = async (req, res, next) => {
       return res.status(200).json({ status: 'processing', message: 'An M-Pesa payment prompt has already been initiated for this order.' });
     }
 
+    const requiredConfig = ['MPESA_CONSUMER_KEY','MPESA_CONSUMER_SECRET','MPESA_SHORTCODE','MPESA_PASSKEY','MPESA_CALLBACK_URL'];
+    const missingConfig = requiredConfig.filter((key) => !process.env[key]);
+    if (String(process.env.PAYMENT_PROVIDER || '').toLowerCase() !== 'mpesa' || missingConfig.length) {
+      return res.status(503).json({ message: 'M-Pesa is not fully configured on the server.' });
+    }
+
+    // Claim the payment attempt before calling Safaricom so concurrent requests
+    // cannot create multiple STK prompts for the same order.
+    const { data: claimed, error: claimError } = await db().from('payments').update({
+      provider: 'mpesa', status: 'processing', provider_phone: normalizedPhone,
+    }).eq('id', payment.id).eq('status', 'pending').is('provider_checkout_id', null)
+      .select('id').maybeSingle();
+    if (claimError) throw claimError;
+    if (!claimed) return res.status(409).json({ message: 'A payment prompt is already being processed for this order.' });
+
     const providerResponse = await initiateMpesaStkPush({
       amount: Number(payment.amount),
       phone: normalizedPhone,
       orderId: order.id,
     });
     if (String(providerResponse.ResponseCode) !== '0' || !providerResponse.CheckoutRequestID) {
+      await db().from('payments').update({ status: 'pending', provider_phone: null })
+        .eq('id', payment.id).eq('status', 'processing').is('provider_checkout_id', null);
       return res.status(502).json({ message: providerResponse.ResponseDescription || 'M-Pesa did not accept the payment request.' });
     }
 
