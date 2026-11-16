@@ -19,6 +19,7 @@ export default function TicketSheet({ event, onClose }) {
   const [phone, setPhone] = useState('')
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentMessage, setPaymentMessage] = useState('')
+  const [checkoutKey, setCheckoutKey] = useState('')
 
   useEffect(() => {
     let active = true
@@ -44,7 +45,9 @@ export default function TicketSheet({ event, onClose }) {
     setSubmitting(true)
     setError('')
     try {
-      const result = await createOrder({ eventId, ticketTypeId: selectedType.id, quantity })
+      const key = checkoutKey || globalThis.crypto?.randomUUID?.() || `checkout-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      if (!checkoutKey) setCheckoutKey(key)
+      const result = await createOrder({ eventId, ticketTypeId: selectedType.id, quantity, idempotencyKey: key })
       setOrder(result)
     } catch (err) {
       setError(err.response?.data?.message || 'Could not create the order.')
