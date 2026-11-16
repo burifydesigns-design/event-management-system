@@ -16,13 +16,16 @@ exports.listEvents = async (req,res,next) => {
   const p=Math.max(1,Number(page)),l=Math.min(100,Math.max(1,Number(limit)));
   const {data,error,count}=await q.order('event_date').range((p-1)*l,p*l-1);
   if(error)throw error;
+  res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
   res.json({events:(data||[]).map(eventShape),page:p,limit:l,totalEvents:count||0,totalPages:Math.ceil((count||0)/l)});
  }catch(err){next(err);}
 };
 exports.getEvent=async(req,res,next)=>{
  try{
   const {data,error}=await db().from('events').select('*, organizer:profiles!events_organizer_id_fkey(id,name,email)').eq('id',req.params.id).eq('status','published').is('deleted_at',null).maybeSingle();
-  if(error)throw error;if(!data)return res.status(404).json({message:'Event not found'});res.json(eventShape(data));
+  if(error)throw error;if(!data)return res.status(404).json({message:'Event not found'});
+  res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+  res.json(eventShape(data));
  }catch(err){next(err);}
 };
 exports.createEvent=async(req,res,next)=>{
