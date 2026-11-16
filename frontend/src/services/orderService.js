@@ -11,3 +11,8 @@ export const createOrder = async ({ eventId, ticketTypeId, quantity, idempotency
   })
   return { ...data, idempotencyKey: key }
 }
+
+export const initiateMpesaPayment = async ({ orderId, phone }) => {
+  const { data } = await api.post('/payments/mpesa/stk-push', { orderId, phone })
+  return data
+}
