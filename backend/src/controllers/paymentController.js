@@ -89,8 +89,14 @@ exports.mpesaCallback = async (req, res) => {
 
     const metadata = callback.CallbackMetadata?.Item || [];
     const value = (name) => metadata.find((item) => item.Name === name)?.Value;
-    const receipt = value('MpesaReceiptNumber') || verified.MpesaReceiptNumber;
-    const amount = Number(value('Amount') ?? verified.Amount);
+    const receipt = value('MpesaReceiptNumber');
+    // The callback body is not a trusted payment source. The verified STK query
+    // confirms success; settle against the expected amount already stored in Postgres.
+    const { data: paymentRow, error: paymentLookupError } = await db().from('payments')
+      .select('amount').eq('provider', 'mpesa').eq('provider_checkout_id', checkoutRequestId).maybeSingle();
+    if (paymentLookupError) throw paymentLookupError;
+    if (!paymentRow) throw new Error('M-Pesa payment reference not found');
+    const amount = Number(paymentRow.amount);
     const currency = 'KES';
     const { error } = await db().rpc('complete_mpesa_order_payment', {
       p_checkout_request_id: checkoutRequestId,
