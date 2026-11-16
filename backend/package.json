@@ -1,5 +1,5 @@
 {
-  "name": "event-management-backend",
+  "name": "event-management-system-backend",
   "version": "1.0.0",
   "description": "Event management backend backed by Supabase",
   "main": "server.js",
