@@ -91,7 +91,7 @@ begin
 
   select count(*)::integer into v_confirmed from public.registrations
     where event_id = p_event_id and status = 'confirmed';
-  if v_registration.id is null and v_confirmed >= v_event.capacity then
+  if v_confirmed >= v_event.capacity then
     raise exception using errcode = 'P0001', message = 'event is full';
   end if;
 
