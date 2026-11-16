@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { createOrder } from '../services/orderService'
+import { createOrder, initiateMpesaPayment } from '../services/orderService'
 import { getTicketTypesForEvent } from '../services/ticketService'
 
 function fmtDate(iso) {
@@ -16,6 +16,9 @@ export default function TicketSheet({ event, onClose }) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [order, setOrder] = useState(null)
+  const [phone, setPhone] = useState('')
+  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [paymentMessage, setPaymentMessage] = useState('')
 
   useEffect(() => {
     let active = true
@@ -50,6 +53,20 @@ export default function TicketSheet({ event, onClose }) {
     }
   }
 
+  const startMpesaPayment = async () => {
+    if (!order?.order?.id || !phone.trim()) return
+    setPaymentLoading(true)
+    setPaymentMessage('')
+    try {
+      const result = await initiateMpesaPayment({ orderId: order.order.id, phone })
+      setPaymentMessage(result.customerMessage || result.message || 'Payment prompt sent. Complete the request on your phone.')
+    } catch (err) {
+      setPaymentMessage(err.response?.data?.message || 'Could not start M-Pesa payment.')
+    } finally {
+      setPaymentLoading(false)
+    }
+  }
+
   const close = () => { onClose?.() }
 
   return (
@@ -70,6 +87,14 @@ export default function TicketSheet({ event, onClose }) {
               <p><strong>Order:</strong> {order.order?.id || 'Created'}</p>
               <p><strong>Amount:</strong> {order.payment?.currency || 'KES'} {Number(order.payment?.amount || total).toLocaleString()}</p>
               <p><strong>Status:</strong> {order.payment?.status || 'pending'}</p>
+              <div className="field" style={{ marginTop: 14 }}>
+                <label htmlFor="mpesa-phone">M-Pesa phone number</label>
+                <input id="mpesa-phone" className="input" type="tel" inputMode="tel" autoComplete="tel" placeholder="07XXXXXXXX" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              </div>
+              <button type="button" className="btn btn--primary" onClick={startMpesaPayment} disabled={paymentLoading || !phone.trim()} style={{ marginTop: 12 }}>
+                {paymentLoading ? 'Sending prompt…' : 'Pay with M-Pesa'}
+              </button>
+              {paymentMessage && <div className="alert" role="status" style={{ marginTop: 10 }}>{paymentMessage}</div>}
               <button type="button" className="btn btn--primary" onClick={close} style={{ marginTop: 16 }}>Close</button>
             </>
           ) : loadingTypes ? (
@@ -100,7 +125,7 @@ export default function TicketSheet({ event, onClose }) {
                 {submitting ? 'Creating order…' : 'Create order'}
               </button>
               <p style={{ color: 'var(--mu)', fontSize: 12, marginTop: 12 }}>
-                Payment is not enabled in this build. Creating an order does not charge you or issue a ticket.
+                Your ticket is held for 10 minutes. Complete payment before the hold expires; tickets are issued only after the provider confirms payment.
               </p>
             </>
           )}
