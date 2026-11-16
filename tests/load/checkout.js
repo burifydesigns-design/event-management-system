@@ -54,7 +54,7 @@ export function handleSummary(data) {
       iterations: data.metrics.iterations?.values?.count || 0,
       acceptedOrRejectedChecksPassed: accepted,
       p95Ms: data.metrics.http_req_duration?.values?.['p(95)'],
-      failedRequests: data.metrics.http_req_failed?.values?.passes,
+      failedRequestRate: data.metrics.http_req_failed?.values?.rate,
     }, null, 2) + '\n',
   };
 }
