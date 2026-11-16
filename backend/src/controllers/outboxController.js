@@ -33,7 +33,6 @@ exports.processEmailOutbox = async (req, res) => {
         summary.sent += 1;
       } catch (sendError) {
         const attempts = Number(message.attempts) || 1;
-        const terminal = attempts >= 8;
         const delaySeconds = Math.min(6 * 60 * 60, 60 * (2 ** Math.min(attempts, 8)));
         const { error: updateError } = await db().from('email_outbox').update({
           status: 'failed',
