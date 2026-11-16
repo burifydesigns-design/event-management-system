@@ -28,7 +28,8 @@ create or replace function public.create_order_with_ticket_hold(
   p_event_id uuid,
   p_ticket_type_id uuid,
   p_quantity integer,
-  p_idempotency_key text
+  p_idempotency_key text,
+  p_payment_provider text default 'unconfigured'
 ) returns jsonb
 language plpgsql
 security definer
@@ -106,7 +107,7 @@ begin
   insert into public.payments (
     order_id, provider, amount, currency, status, idempotency_key
   ) values (
-    v_order.id, coalesce(nullif(current_setting('app.payment_provider', true), ''), 'unconfigured'),
+    v_order.id, coalesce(nullif(p_payment_provider, ''), 'unconfigured'),
     v_total, v_currency, 'pending', p_idempotency_key
   ) returning * into v_payment;
 
@@ -138,7 +139,7 @@ exception
 end;
 $$;
 
-revoke all on function public.create_order_with_ticket_hold(uuid,uuid,uuid,integer,text) from public, anon, authenticated;
+revoke all on function public.create_order_with_ticket_hold(uuid,uuid,uuid,integer,text,text) from public, anon, authenticated;
 grant execute on function public.create_order_with_ticket_hold(uuid,uuid,uuid,integer,text) to service_role;
 
 -- Invoke from a scheduled trusted job (pg_cron, QStash or an operator-triggered job).
