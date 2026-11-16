@@ -82,7 +82,7 @@ export default function TicketSheet({ event, onClose }) {
             <>
               <h3>Order created — payment pending</h3>
               <p style={{ color: 'var(--mu)', lineHeight: 1.6 }}>
-                Your order has been recorded, but payment has not been connected or verified. No ticket has been issued and you are not yet registered as paid.
+                Your order has been recorded. Payment is still pending; no ticket has been issued until M-Pesa confirms the transaction.
               </p>
               <p><strong>Order:</strong> {order.order?.id || 'Created'}</p>
               <p><strong>Amount:</strong> {order.payment?.currency || 'KES'} {Number(order.payment?.amount || total).toLocaleString()}</p>
