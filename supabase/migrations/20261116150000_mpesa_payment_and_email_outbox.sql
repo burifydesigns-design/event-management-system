@@ -54,20 +54,19 @@ declare
 begin
   select * into v_payment
   from public.payments
-  where provider = 'mpesa' and provider_checkout_id = p_checkout_request_id
-  for update;
-
+  where provider = 'mpesa' and provider_checkout_id = p_checkout_request_id;
   if not found then
     raise exception using errcode = 'P0002', message = 'payment reference not found';
   end if;
 
-  if v_payment.status = 'succeeded' then
-    return jsonb_build_object('success', true, 'replayed', true, 'order_id', v_payment.order_id);
-  end if;
-
+  -- Lock the order before the payment row; this matches hold-expiry cleanup lock order.
   select * into v_order from public.orders where id = v_payment.order_id for update;
   if not found then
     raise exception using errcode = 'P0002', message = 'order not found';
+  end if;
+  select * into v_payment from public.payments where id = v_payment.id for update;
+  if v_payment.status = 'succeeded' then
+    return jsonb_build_object('success', true, 'replayed', true, 'order_id', v_payment.order_id);
   end if;
   if v_order.status <> 'pending' or v_order.hold_expires_at is null or v_order.hold_expires_at <= now() then
     raise exception using errcode = 'P0001', message = 'order hold expired or is no longer payable';
@@ -155,13 +154,12 @@ declare
 begin
   select * into v_payment
   from public.payments
-  where provider = 'mpesa' and provider_checkout_id = p_checkout_request_id
-  for update;
+  where provider = 'mpesa' and provider_checkout_id = p_checkout_request_id;
   if not found then return false; end if;
-  if v_payment.status in ('succeeded','refunded','partially_refunded') then return false; end if;
-
   select * into v_order from public.orders where id = v_payment.order_id for update;
   if not found or v_order.status <> 'pending' then return false; end if;
+  select * into v_payment from public.payments where id = v_payment.id for update;
+  if v_payment.status in ('succeeded','refunded','partially_refunded') then return false; end if;
 
   for v_item in select ticket_type_id, quantity from public.order_items where order_id = v_order.id loop
     update public.ticket_types
@@ -192,10 +190,11 @@ as $$
   with candidates as (
     select id
     from public.email_outbox
-    where status in ('pending','failed')
-      and available_at <= now()
+    where (
+        (status in ('pending','failed') and available_at <= now())
+        or (status = 'processing' and locked_at < now() - interval '5 minutes')
+      )
       and attempts < 8
-      and (status <> 'processing' or locked_at < now() - interval '5 minutes')
     order by created_at
     limit least(greatest(p_batch_size, 1), 100)
     for update skip locked
