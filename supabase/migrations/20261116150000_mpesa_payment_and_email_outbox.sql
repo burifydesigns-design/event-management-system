@@ -195,6 +195,7 @@ as $$
     where status in ('pending','failed')
       and available_at <= now()
       and attempts < 8
+      and (status <> 'processing' or locked_at < now() - interval '5 minutes')
     order by created_at
     limit least(greatest(p_batch_size, 1), 100)
     for update skip locked
