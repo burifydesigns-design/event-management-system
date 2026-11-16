@@ -37,6 +37,9 @@ create policy ticket_types_delete_owner_or_admin on public.ticket_types
       and (e.organizer_id = (select auth.uid()) or (select private.has_role(array['admin'])))));
 
 -- Prevent direct REST writes that bypass server-side price, stock and payment checks.
+-- Event mutations also stay behind the role-checked Express API; this prevents direct REST
+-- writes from publishing drafts or hard-deleting events and their dependent ticket data.
+revoke insert, update, delete on public.events from anon, authenticated;
 drop policy if exists registrations_insert_self on public.registrations;
 drop policy if exists registrations_update_attendee_or_admin on public.registrations;
 drop policy if exists orders_insert_self on public.orders;
