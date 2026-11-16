@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
 import Loading from '../components/Loading'
 import ErrorMessage from '../components/ErrorMessage'
 import { getRegistration } from '../services/registrationService'
@@ -36,7 +35,6 @@ function toSvgDataUrl(svg) {
 
 export default function DigitalTicket() {
   const { registrationId } = useParams()
-  const { user } = useAuth()
   const [registration, setRegistration] = useState(null)
   const [event, setEvent] = useState(null)
   const [loading, setLoading] = useState(true)
