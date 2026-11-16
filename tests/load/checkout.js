@@ -1,6 +1,5 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { randomUUID } from 'k6/crypto';
 
 export const options = {
   scenarios: {
@@ -35,7 +34,7 @@ export default function () {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
-        'Idempotency-Key': randomUUID(),
+        'Idempotency-Key': `load-${Date.now()}-${__VU}-${__ITER}-${Math.random().toString(36).slice(2)}`,
       },
       timeout: '15s',
     },
