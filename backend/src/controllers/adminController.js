@@ -15,24 +15,28 @@ async function assertEventAccess(eventId, user) {
 
 exports.getDashboard = async (req, res, next) => {
   try {
-    const [users, events, regs, upcoming, checked, capacity] = await Promise.all([
+    const [users, events, regs, upcoming, checkedRegistrations, checkedTickets, capacity] = await Promise.all([
       db().from('profiles').select('id', { count: 'exact', head: true }),
       db().from('events').select('id', { count: 'exact', head: true }).is('deleted_at', null),
       db().from('registrations').select('id', { count: 'exact', head: true }),
       db().from('events').select('id', { count: 'exact', head: true })
         .eq('status', 'published').is('deleted_at', null).gte('event_date', new Date().toISOString()),
+      db().from('registrations').select('id', { count: 'exact', head: true }).eq('checked_in', true),
       db().from('ticket_instances').select('id', { count: 'exact', head: true }).eq('status', 'used'),
       db().from('events').select('id,capacity').eq('status', 'published').is('deleted_at', null),
     ]);
-    for (const result of [users, events, regs, upcoming, checked, capacity]) if (result.error) throw result.error;
+    for (const result of [users, events, regs, upcoming, checkedRegistrations, checkedTickets, capacity]) if (result.error) throw result.error;
 
     const eventIds = (capacity.data || []).map((event) => event.id);
     let confirmedByEvent = [];
     if (eventIds.length) {
-      const { data, error } = await db().from('registrations')
-        .select('event_id').in('event_id', eventIds).eq('status', 'confirmed');
-      if (error) throw error;
-      confirmedByEvent = data || [];
+      const [registrationRows, paidTickets] = await Promise.all([
+        db().from('registrations').select('event_id').in('event_id', eventIds).eq('status', 'confirmed'),
+        db().from('ticket_instances').select('event_id').in('event_id', eventIds).neq('status', 'void'),
+      ]);
+      if (registrationRows.error) throw registrationRows.error;
+      if (paidTickets.error) throw paidTickets.error;
+      confirmedByEvent = [...(registrationRows.data || []), ...(paidTickets.data || [])];
     }
     const sold = confirmedByEvent.reduce((counts, row) => {
       counts[row.event_id] = (counts[row.event_id] || 0) + 1;
@@ -44,7 +48,7 @@ exports.getDashboard = async (req, res, next) => {
     res.json({
       totalUsers: users.count || 0, totalEvents: events.count || 0,
       totalRegistrations: regs.count || 0, upcomingEvents: upcoming.count || 0,
-      availableSeats, checkedInAttendees: checked.count || 0,
+      availableSeats, checkedInAttendees: (checkedRegistrations.count || 0) + (checkedTickets.count || 0),
     });
   } catch (err) { next(err); }
 };
