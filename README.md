@@ -88,3 +88,18 @@ Call these authenticated server-side jobs from QStash or another trusted schedul
 ### Rollout safety
 
 Apply the new SQL migrations to a staging Supabase project first. Test concurrent reservations, duplicate idempotency keys, expiry release, M-Pesa sandbox callbacks, duplicate callbacks, email retry behavior and organizer authorization before production. No production secrets are committed, and no migration is applied to your Supabase project by this repository change.
+
+
+### Checkout load test
+
+A k6 scenario is provided at `tests/load/checkout.js`. Run it only against a staging deployment and staging Supabase project with disposable attendee accounts:
+
+```bash
+k6 run -e API_URL=https://staging-api.example.com/api \
+  -e EVENT_ID=<staging-event-id> \
+  -e TICKET_TYPE_ID=<staging-ticket-type-id> \
+  -e ATTENDEE_TOKENS=<comma-separated-staging-access-tokens> \
+  -e VUS=100 -e ITERATIONS=100 tests/load/checkout.js
+```
+
+Use a staging ticket type with exactly the number of tickets you want to test. Then verify in Supabase that `quantity_sold + quantity_reserved` never exceeds `quantity_available`, that successful orders equal accepted holds, and that duplicate idempotency keys do not create extra orders. Do not run against production inventory.
