@@ -112,3 +112,8 @@ $$;
 revoke all on function public.register_free_event(uuid,uuid,text) from public, anon, authenticated;
 grant execute on function public.register_free_event(uuid,uuid,text) to service_role;
 revoke insert, update, delete on public.payments, public.refunds from anon, authenticated;
+
+-- Align new-event and new-order defaults with the platform's KES checkout defaults.
+-- Existing rows and explicitly selected currencies are not rewritten.
+alter table public.events alter column currency set default 'KES';
+alter table public.orders alter column currency set default 'KES';
