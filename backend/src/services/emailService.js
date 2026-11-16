@@ -1,12 +1,12 @@
 const RESEND_API_URL = 'https://api.resend.com/emails';
 
-async function sendTransactionalEmail({ to, subject, html, text }) {
+async function sendTransactionalEmail({ to, subject, html, text, idempotencyKey }) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
   if (!apiKey || !from) throw new Error('RESEND_API_KEY and EMAIL_FROM must be configured');
   const response = await fetch(RESEND_API_URL, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
     body: JSON.stringify({ from, to: [to], subject, html, text }),
   });
   const result = await response.json().catch(() => ({}));
@@ -34,6 +34,7 @@ async function sendOutboxMessage(message) {
     subject: `Payment confirmed: ${title}`,
     html,
     text,
+    idempotencyKey: message.id,
   });
 }
 
