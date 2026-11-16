@@ -101,33 +101,76 @@ exports.exportEventAttendees = async (req, res, next) => {
 
 exports.getAnalytics = async (req, res, next) => {
   try {
-    let q = db().from('registrations')
-      .select('event_id,status,checked_in,registered_at,event:events!registrations_event_id_fkey(id,title,capacity,organizer_id)');
+    let organizerEventIds = null;
     if (req.user.role === 'organizer') {
-      const { data: owned, error } = await db().from('events').select('id').eq('organizer_id', req.user.userId);
+      const { data: owned, error } = await db().from('events').select('id')
+        .eq('organizer_id', req.user.userId);
       if (error) throw error;
-      const ids = (owned || []).map((event) => event.id);
-      if (!ids.length) return res.json({ registrationsOverTime: [], registrationsPerEvent: [], checkInRate: 0, totalCheckedIn: 0, totalConfirmed: 0, capacityUtilization: [] });
-      q = q.in('event_id', ids);
+      organizerEventIds = (owned || []).map((event) => event.id);
+      if (!organizerEventIds.length) {
+        return res.json({ registrationsOverTime: [], registrationsPerEvent: [], checkInRate: 0, totalCheckedIn: 0, totalConfirmed: 0, capacityUtilization: [] });
+      }
     }
-    if (req.query.startDate && Number.isFinite(Date.parse(req.query.startDate))) q = q.gte('registered_at', new Date(req.query.startDate).toISOString());
-    if (req.query.endDate && Number.isFinite(Date.parse(req.query.endDate))) q = q.lte('registered_at', new Date(`${req.query.endDate}T23:59:59.999Z`).toISOString());
-    const { data, error } = await q;
-    if (error) throw error;
-    const rows = data || [];
+
+    let registrationsQuery = db().from('registrations')
+      .select('event_id,status,checked_in,registered_at');
+    let paidTicketsQuery = db().from('ticket_instances')
+      .select('event_id,status,created_at').neq('status', 'void');
+    if (organizerEventIds) {
+      registrationsQuery = registrationsQuery.in('event_id', organizerEventIds);
+      paidTicketsQuery = paidTicketsQuery.in('event_id', organizerEventIds);
+    }
+    if (req.query.startDate && Number.isFinite(Date.parse(req.query.startDate))) {
+      const startDate = new Date(req.query.startDate).toISOString();
+      registrationsQuery = registrationsQuery.gte('registered_at', startDate);
+      paidTicketsQuery = paidTicketsQuery.gte('created_at', startDate);
+    }
+    if (req.query.endDate && Number.isFinite(Date.parse(req.query.endDate))) {
+      const endDate = new Date(`${req.query.endDate}T23:59:59.999Z`).toISOString();
+      registrationsQuery = registrationsQuery.lte('registered_at', endDate);
+      paidTicketsQuery = paidTicketsQuery.lte('created_at', endDate);
+    }
+
+    const [registrationsResult, ticketsResult] = await Promise.all([registrationsQuery, paidTicketsQuery]);
+    if (registrationsResult.error) throw registrationsResult.error;
+    if (ticketsResult.error) throw ticketsResult.error;
+
+    const rows = [
+      ...(registrationsResult.data || []).map((row) => ({
+        event_id: row.event_id, status: row.status, checked_in: row.checked_in,
+        registered_at: row.registered_at,
+      })),
+      ...(ticketsResult.data || []).map((row) => ({
+        event_id: row.event_id, status: row.status === 'void' ? 'cancelled' : 'confirmed',
+        checked_in: row.status === 'used', registered_at: row.created_at,
+      })),
+    ];
+
+    const eventIds = [...new Set(rows.map((row) => row.event_id))];
+    const eventMap = new Map();
+    if (eventIds.length) {
+      const { data: events, error } = await db().from('events')
+        .select('id,title,capacity,organizer_id').in('id', eventIds);
+      if (error) throw error;
+      for (const event of events || []) eventMap.set(event.id, event);
+    }
+
     const confirmed = rows.filter((row) => row.status === 'confirmed');
     const checked = confirmed.filter((row) => row.checked_in);
-    const byDay = {}, byEvent = {};
+    const byDay = {};
+    const byEvent = {};
     for (const row of rows) {
       const day = String(row.registered_at).slice(0, 10);
       byDay[day] = (byDay[day] || 0) + 1;
       if (row.status === 'confirmed') {
-        byEvent[row.event_id] ||= { eventId: row.event_id, eventName: row.event?.title || 'Event', count: 0 };
+        const event = eventMap.get(row.event_id);
+        byEvent[row.event_id] ||= {
+          eventId: row.event_id, eventName: event?.title || 'Event', count: 0,
+        };
         byEvent[row.event_id].count += 1;
       }
     }
-    const eventMap = new Map();
-    for (const row of rows) if (row.event) eventMap.set(row.event.id, row.event);
+
     const counts = {};
     for (const row of confirmed) counts[row.event_id] = (counts[row.event_id] || 0) + 1;
     const capacityUtilization = [...eventMap.values()].map((event) => ({
@@ -135,8 +178,10 @@ exports.getAnalytics = async (req, res, next) => {
       registered: counts[event.id] || 0,
       utilization: event.capacity ? ((counts[event.id] || 0) / event.capacity) * 100 : 0,
     })).sort((a, b) => b.utilization - a.utilization);
+
     res.json({
-      registrationsOverTime: Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b)).map(([_id, count]) => ({ _id, count })),
+      registrationsOverTime: Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b))
+        .map(([_id, count]) => ({ _id, count })),
       registrationsPerEvent: Object.values(byEvent).sort((a, b) => b.count - a.count),
       checkInRate: confirmed.length ? checked.length / confirmed.length * 100 : 0,
       totalCheckedIn: checked.length, totalConfirmed: confirmed.length, capacityUtilization,
