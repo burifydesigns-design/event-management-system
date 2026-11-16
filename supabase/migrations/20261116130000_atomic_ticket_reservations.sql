@@ -140,7 +140,7 @@ end;
 $$;
 
 revoke all on function public.create_order_with_ticket_hold(uuid,uuid,uuid,integer,text,text) from public, anon, authenticated;
-grant execute on function public.create_order_with_ticket_hold(uuid,uuid,uuid,integer,text) to service_role;
+grant execute on function public.create_order_with_ticket_hold(uuid,uuid,uuid,integer,text,text) to service_role;
 
 -- Invoke from a scheduled trusted job (pg_cron, QStash or an operator-triggered job).
 -- SKIP LOCKED makes concurrent cleanup runs safe.
