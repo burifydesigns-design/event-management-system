@@ -1,4 +1,4 @@
-const { getSupabase } = require('../config/db');
+const { getSupabase, createSupabaseAuthClient } = require('../config/db');
 
 exports.register = async (req, res, next) => {
   try {
@@ -8,10 +8,18 @@ exports.register = async (req, res, next) => {
       email: normalizedEmail, password, email_confirm: true,
       user_metadata: { name: String(name || '').trim() },
     });
-    if (error) return res.status(400).json({ message: error.message });
-    const { data: sessionData, error: signInError } = await getSupabase().auth.signInWithPassword({ email: normalizedEmail, password });
-    if (signInError) return res.status(400).json({ message: signInError.message });
-    const { data: profile } = await getSupabase().from('profiles').select('*').eq('id', data.user.id).single();
+    if (error) return res.status(400).json({ message: 'Could not create account' });
+
+    const authClient = createSupabaseAuthClient();
+    const { data: sessionData, error: signInError } = await authClient.auth.signInWithPassword({
+      email: normalizedEmail, password,
+    });
+    if (signInError || !sessionData.session) {
+      return res.status(400).json({ message: 'Account created, but sign-in could not be completed. Please log in.' });
+    }
+    const { data: profile, error: profileError } = await getSupabase()
+      .from('profiles').select('id,name,email,role').eq('id', data.user.id).single();
+    if (profileError) return res.status(500).json({ message: 'Account profile is not ready. Please contact support.' });
     res.status(201).json({ token: sessionData.session.access_token, user: profile });
   } catch (err) { next(err); }
 };
@@ -19,12 +27,13 @@ exports.register = async (req, res, next) => {
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    const { data, error } = await getSupabase().auth.signInWithPassword({
+    const authClient = createSupabaseAuthClient();
+    const { data, error } = await authClient.auth.signInWithPassword({
       email: String(email || '').trim().toLowerCase(), password,
     });
     if (error || !data.session) return res.status(401).json({ message: 'Invalid email or password' });
     const { data: profile, error: profileError } = await getSupabase()
-      .from('profiles').select('*').eq('id', data.user.id).single();
+      .from('profiles').select('id,name,email,role').eq('id', data.user.id).single();
     if (profileError) return res.status(403).json({ message: 'Account profile is not provisioned' });
     res.json({ token: data.session.access_token, user: profile });
   } catch (err) { next(err); }
@@ -38,7 +47,7 @@ exports.updateProfile = async (req, res, next) => {
     const { data, error } = await getSupabase().from('profiles')
       .update({ name: String(name || '').trim() }).eq('id', req.user.userId)
       .select('id,name,email,role').single();
-    if (error) return res.status(400).json({ message: error.message });
+    if (error) return res.status(400).json({ message: 'Could not update profile' });
     res.json({ user: data });
   } catch (err) { next(err); }
 };
