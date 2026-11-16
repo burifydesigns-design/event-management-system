@@ -10,11 +10,6 @@ const prevPageBtn = document.getElementById('prevPage');
 const nextPageBtn = document.getElementById('nextPage');
 const pageInfo = document.getElementById('pageInfo');
 
-function escapeHTML(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  })[char]);
-}
 function safeImageURL(value) {
   if (!value) return '';
   try {
