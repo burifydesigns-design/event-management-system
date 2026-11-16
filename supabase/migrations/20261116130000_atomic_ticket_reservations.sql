@@ -92,6 +92,10 @@ begin
     raise exception using errcode = 'P0001', message = 'not enough tickets are available';
   end if;
 
+  -- Opportunistically release expired holds so availability recovers even when a
+  -- scheduler invocation is delayed. A scheduled worker still handles idle periods.
+  perform public.release_expired_ticket_holds(100);
+
   v_total := v_ticket.price * p_quantity;
   v_currency := coalesce(v_event.currency, 'KES');
 
