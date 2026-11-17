@@ -76,7 +76,7 @@ export const listCoordinators = async () => {
 }
 
 export const getOverviewAnalytics = async () => {
-  const { data } = await api.get('/analytics/overview')
+  const { data } = await api.get('/admin/dashboard')
   return data
 }
 
@@ -86,8 +86,21 @@ export const getEventAnalytics = async (eventId) => {
 }
 
 export const getPlatformAnalytics = async (params = {}) => {
-  const { data } = await api.get('/analytics/platform', { params })
-  return data
+  const { start, end } = params
+  const { data } = await api.get('/admin/analytics', {
+    params: { startDate: start || undefined, endDate: end || undefined },
+  })
+  return {
+    ...data,
+    registrationTrends: data.registrationsOverTime || [],
+    checkInTrends: [],
+    revenueOverTime: [],
+    eventsByCategory: [],
+    topEvents: (data.registrationsPerEvent || []).map((event) => ({
+      title: event.eventName,
+      registrations: event.count,
+    })),
+  }
 }
 
 export const getOrganizerAnalytics = async (params = {}) => {

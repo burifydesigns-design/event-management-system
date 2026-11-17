@@ -48,13 +48,13 @@ export default function AdminDashboard() {
   const totalUsers = overview?.totalUsers || 0
   const totalEvents = overview?.totalEvents || 0
   const totalRegistrations = overview?.totalRegistrations || 0
-  const attendanceRate = overview?.attendanceRate || 0
-  const grossRevenue = overview?.grossRevenue || 0
+  const attendanceRate = platform?.checkInRate || 0
+  const availableSeats = overview?.availableSeats || 0
 
   const regTrends = overview?.registrationTrends || []
   const checkInTrends = overview?.checkInTrends || []
-  const revTrends = platform?.revenueOverTime || []
-  const eventsByCategory = platform?.eventsByCategory || []
+  const revTrends = platform?.capacityUtilization || []
+  const eventsByCategory = platform?.topEvents || []
   const topEvents = platform?.topEvents || []
 
   return (
@@ -139,8 +139,8 @@ export default function AdminDashboard() {
           <div className="stat-card stat-card--info">
             <div className="stat-icon">💰</div>
             <div className="stat-content">
-              <p className="stat-value">${grossRevenue.toLocaleString()}</p>
-              <p className="stat-label">Gross Revenue</p>
+              <p className="stat-value">${availableSeats.toLocaleString()}</p>
+              <p className="stat-label">Available Seats</p>
             </div>
           </div>
           <div className="stat-card stat-card--warning">
@@ -207,15 +207,15 @@ export default function AdminDashboard() {
 
           <div className="dashboard-section chart-section">
             <div className="section-header">
-              <h2 className="section-title">Events by Category</h2>
+              <h2 className="section-title">Top Events by Registrations</h2>
             </div>
             <div className="chart-wrapper">
               {eventsByCategory.length > 0 ? (
                 <Doughnut
                   data={{
-                    labels: eventsByCategory.map((e) => e._id),
+                    labels: eventsByCategory.map((e) => e.title),
                     datasets: [{
-                      data: eventsByCategory.map((e) => e.count),
+                      data: eventsByCategory.map((e) => e.registrations),
                       backgroundColor: ['#0b6b4f', '#f2b01e', '#1d3557', '#c0283a', '#5b2a86', '#0a7e8c'],
                     }],
                   }}
@@ -229,16 +229,16 @@ export default function AdminDashboard() {
 
           <div className="dashboard-section chart-section">
             <div className="section-header">
-              <h2 className="section-title">Revenue Over Time</h2>
+              <h2 className="section-title">Event Capacity Utilization</h2>
             </div>
             <div className="chart-wrapper">
               {revTrends.length > 0 ? (
                 <Bar
                   data={{
-                    labels: revTrends.map((d) => d._id),
+                    labels: revTrends.map((d) => d.eventName),
                     datasets: [{
-                      label: 'Revenue ($)',
-                      data: revTrends.map((d) => d.gross),
+                      label: 'Registered attendees',
+                      data: revTrends.map((d) => d.registered),
                       backgroundColor: '#0b6b4f',
                     }],
                   }}
