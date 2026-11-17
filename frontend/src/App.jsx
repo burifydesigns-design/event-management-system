@@ -5,6 +5,8 @@ import Home from './pages/Home'
 import Events from './pages/Events'
 import EventDetails from './pages/EventDetails'
 import Login from './pages/Login'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import Register from './pages/Register'
 import CreateEvent from './pages/CreateEvent'
 import EditEvent from './pages/EditEvent'
@@ -32,6 +34,8 @@ function App() {
         <Route path="/events" element={<Events />} />
         <Route path="/events/:id" element={<EventDetails />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/register" element={<Register />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/profile" element={<Profile />} />
