@@ -28,10 +28,24 @@ const allowedOrigins = (process.env.FRONTEND_URL || '')
   .split(',')
   .map((value) => value.trim())
   .filter(Boolean);
+
+function isAllowedFrontendOrigin(origin) {
+  if (allowedOrigins.includes(origin)) return true;
+  try {
+    const parsed = new URL(origin);
+    // Vercel deployment URLs for this frontend project use this project-specific hostname prefix.
+    return parsed.protocol === 'https:' &&
+      /^event-management-system(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(parsed.hostname) &&
+      parsed.port === '';
+  } catch {
+    return false;
+  }
+}
+
 const corsOptions = {
   credentials: true,
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    if (!origin || isAllowedFrontendOrigin(origin)) return callback(null, true);
     return callback(new Error('Origin is not allowed by CORS'));
   },
 };
