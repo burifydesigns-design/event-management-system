@@ -29,24 +29,23 @@ const allowedOrigins = (process.env.FRONTEND_URL || '')
   .map((value) => value.trim())
   .filter(Boolean);
 
+// Exact-match allowlist only. Hostname patterns on *.vercel.app are NOT safe: anyone can create a
+// Vercel project whose domain matches a pattern like "event-management-system-<anything>-<team>.vercel.app",
+// and this API sends credentialed CORS headers. Add every frontend origin (production alias, custom
+// domain, any stable preview alias) to FRONTEND_URL as a comma-separated list.
 function isAllowedFrontendOrigin(origin) {
-  if (allowedOrigins.includes(origin)) return true;
-  try {
-    const parsed = new URL(origin);
-    // Vercel deployment URLs for this frontend project use this project-specific hostname prefix.
-    return parsed.protocol === 'https:' &&
-      /^event-management-system(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(parsed.hostname) &&
-      parsed.port === '';
-  } catch {
-    return false;
-  }
+  return allowedOrigins.includes(origin);
 }
 
 const corsOptions = {
   credentials: true,
   origin(origin, callback) {
     if (!origin || isAllowedFrontendOrigin(origin)) return callback(null, true);
-    return callback(new Error('Origin is not allowed by CORS'));
+    // Log the rejected origin (bounded and JSON-encoded) so a missing legitimate origin is easy to spot.
+    console.warn(JSON.stringify({ event: 'cors_rejected', origin: String(origin).slice(0, 200) }));
+    const err = new Error('Origin is not allowed');
+    err.status = 403;
+    return callback(err);
   },
 };
 app.use(cors(corsOptions));
