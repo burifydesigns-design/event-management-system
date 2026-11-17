@@ -248,7 +248,6 @@ export default function ScannerPage() {
           <div className={`result-overlay ${result.kind === 'ok' ? '' : ''}`} onClick={() => {
             clearTimeout(resultTimerRef.current)
             setResult(null)
-            setResultRaw(null)
             startCamera()
           }} role="alert" aria-live="assertive">
             <div className={`result__icon result__icon--${result.kind === 'ok' ? 'ok' : result.kind === 'bad' ? 'bad' : 'wr'}`} aria-hidden="true">
