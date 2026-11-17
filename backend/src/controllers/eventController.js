@@ -31,42 +31,78 @@ exports.getEvent=async(req,res,next)=>{
   res.json(eventShape(data));
  }catch(err){next(err);}
 };
-exports.createEvent=async(req,res,next)=>{
- try{
-  const b=req.body;
-  const payload={title:b.title,description:b.description,category:b.category,event_date:b.event_date||b.date,event_time:b.event_time||b.time,location:b.location,city:b.city,capacity:Number(b.capacity),price:Number(b.price||0),image:b.image||'',organizer_id:req.user.userId,status:b.status||'draft'};
-  const {data,error}=await db().from('events').insert(payload).select('*').single();
-  if(error)throw error;res.status(201).json(eventShape(data));
- }catch(err){next(err);}
+
+exports.createEvent = async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const payload = {
+      title: b.title, description: b.description, category: b.category,
+      event_date: b.event_date || b.date, event_time: b.event_time || b.time,
+      location: b.location, city: b.city, capacity: Number(b.capacity),
+      price: Number(b.price || 0), image: b.image || '',
+      organizer_id: req.user.userId, status: 'draft',
+    };
+    const { data, error } = await db().from('events').insert(payload).select('*').single();
+    if (error) throw error;
+    res.status(201).json(eventShape(data));
+  } catch (err) { next(err); }
 };
-exports.updateEvent=async(req,res,next)=>{
- try{
-  const {data:old,error:readError}=await db().from('events').select('organizer_id').eq('id',req.params.id).maybeSingle();
-  if(readError)throw readError;if(!old)return res.status(404).json({message:'Event not found'});
-  if(old.organizer_id!==req.user.userId&&req.user.role!=='admin')return res.status(403).json({message:'Not your event'});
-  const b=req.body,p={};
-  ['title','description','category','location','city','capacity','price','image','status'].forEach(k=>{if(b[k]!==undefined)p[k]=b[k];});
-  if(b.time!==undefined)p.event_time=b.time;if(b.event_time!==undefined)p.event_time=b.event_time;
-  if(b.date!==undefined)p.event_date=b.date;if(b.event_date!==undefined)p.event_date=b.event_date;
-  const {data,error}=await db().from('events').update(p).eq('id',req.params.id).select('*').single();
-  if(error)throw error;res.json(eventShape(data));
- }catch(err){next(err);}
+
+async function getOwnedEvent(eventId, user) {
+  const { data, error } = await db().from('events')
+    .select('id,organizer_id,status').eq('id', eventId).maybeSingle();
+  if (error) throw error;
+  if (!data) return { errorStatus: 404, message: 'Event not found' };
+  if (user.role !== 'admin' && data.organizer_id !== user.userId) {
+    return { errorStatus: 403, message: 'You cannot manage this event' };
+  }
+  return { event: data };
+}
+
+exports.updateEvent = async (req, res, next) => {
+  try {
+    const owned = await getOwnedEvent(req.params.id, req.user);
+    if (owned.errorStatus) return res.status(owned.errorStatus).json({ message: owned.message });
+    const b = req.body || {};
+    const payload = {};
+    // Publication state is changed only by the dedicated publish endpoint.
+    ['title', 'description', 'category', 'location', 'city', 'capacity', 'price', 'image',
+      'registration_opens_at', 'registration_closes_at', 'timezone', 'currency'].forEach((key) => {
+      if (b[key] !== undefined) payload[key] = b[key];
+    });
+    if (b.time !== undefined) payload.event_time = b.time;
+    if (b.event_time !== undefined) payload.event_time = b.event_time;
+    if (b.date !== undefined) payload.event_date = b.date;
+    if (b.event_date !== undefined) payload.event_date = b.event_date;
+    if (!Object.keys(payload).length) return res.status(400).json({ message: 'No editable event fields supplied' });
+    const { data, error } = await db().from('events').update(payload)
+      .eq('id', req.params.id).select('*').single();
+    if (error) throw error;
+    res.json(eventShape(data));
+  } catch (err) { next(err); }
 };
-exports.deleteEvent=async(req,res,next)=>{
- try{
-  const {data:old,error:readError}=await db().from('events').select('organizer_id').eq('id',req.params.id).maybeSingle();
-  if(readError)throw readError;if(!old)return res.status(404).json({message:'Event not found'});
-  if(old.organizer_id!==req.user.userId&&req.user.role!=='admin')return res.status(403).json({message:'Not your event'});
-  const {error}=await db().from('events').delete().eq('id',req.params.id);
-  if(error)throw error;res.json({message:'Event deleted'});
- }catch(err){next(err);}
+
+exports.deleteEvent = async (req, res, next) => {
+  try {
+    const owned = await getOwnedEvent(req.params.id, req.user);
+    if (owned.errorStatus) return res.status(owned.errorStatus).json({ message: owned.message });
+    const { error } = await db().from('events')
+      .update({ deleted_at: new Date().toISOString() }).eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ message: 'Event archived' });
+  } catch (err) { next(err); }
 };
-exports.publishEvent=async(req,res,next)=>{
- try{
-  const {data:old,error:readError}=await db().from('events').select('organizer_id,status').eq('id',req.params.id).maybeSingle();
-  if(readError)throw readError;if(!old)return res.status(404).json({message:'Event not found'});
-  if(old.organizer_id!==req.user.userId&&req.user.role!=='admin')return res.status(403).json({message:'Not your event'});
-  const {data,error}=await db().from('events').update({status:old.status==='published'?'draft':'published'}).eq('id',req.params.id).select('*').single();
-  if(error)throw error;res.json(eventShape(data));
- }catch(err){next(err);}
+
+exports.publishEvent = async (req, res, next) => {
+  try {
+    const owned = await getOwnedEvent(req.params.id, req.user);
+    if (owned.errorStatus) return res.status(owned.errorStatus).json({ message: owned.message });
+    const nextStatus = owned.event.status === 'published' ? 'draft' : 'published';
+    const update = { status: nextStatus };
+    if (nextStatus === 'published') update.published_at = new Date().toISOString();
+    const { data, error } = await db().from('events').update(update)
+      .eq('id', req.params.id).select('*').single();
+    if (error) throw error;
+    res.json(eventShape(data));
+  } catch (err) { next(err); }
 };

@@ -1,5 +1,10 @@
 const API_BASE = 'http://localhost:5000/api';
 
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[char]);
+}
 function getToken() { return localStorage.getItem('token'); }
 function getUser() { const raw = localStorage.getItem('user'); return raw ? JSON.parse(raw) : null; }
 function apiHeaders() {
@@ -13,13 +18,15 @@ async function fetchJson(path, options = {}) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/coordinator/login.html';
+    throw new Error('Your session has expired. Please sign in again.');
   }
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error('Request failed');
   return res.json();
 }
 
 function formatDate(value) {
-  return new Date(value).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Date unavailable' : date.toLocaleDateString('en-KE', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 const coordinatorDashboard = {
@@ -30,8 +37,8 @@ const coordinatorDashboard = {
       return;
     }
 
-    document.getElementById('user-name').textContent = user.name;
-    document.getElementById('user-avatar').textContent = user.name.charAt(0).toUpperCase();
+    document.getElementById('user-name').textContent = user.name || 'Coordinator';
+    document.getElementById('user-avatar').textContent = (user.name || 'C').charAt(0).toUpperCase();
 
     await this.loadStats();
     await this.loadEvents();
@@ -82,17 +89,21 @@ const coordinatorDashboard = {
         container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📅</div><div class="empty-state-title">No events</div></div>';
         return;
       }
-      container.innerHTML = events.map((e) => `
-        <tr>
-          <td>${e.title}</td>
-          <td>${formatDate(e.date)}</td>
-          <td>${e.city}</td>
-          <td><span class="badge ${e.status === 'published' ? 'badge-success' : 'badge-secondary'}">${e.status}</span></td>
-          <td class="table-actions">
-            <a href="/coordinator/scan.html?event=${e._id}" class="table-link">Scan Tickets</a>
-          </td>
-        </tr>
-      `).join('');
+      container.innerHTML = events.map((e) => {
+        const id = encodeURIComponent(String(e._id || ''));
+        const status = e.status === 'published' ? 'published' : 'draft';
+        return `
+          <tr>
+            <td>${escapeHTML(e.title)}</td>
+            <td>${escapeHTML(formatDate(e.date))}</td>
+            <td>${escapeHTML(e.city)}</td>
+            <td><span class="badge ${status === 'published' ? 'badge-success' : 'badge-secondary'}">${status}</span></td>
+            <td class="table-actions">
+              <a href="/coordinator/scan.html?event=${id}" class="table-link">Scan Tickets</a>
+            </td>
+          </tr>
+        `;
+      }).join('');
     } catch (err) {
       console.error('Failed to load events:', err);
     }

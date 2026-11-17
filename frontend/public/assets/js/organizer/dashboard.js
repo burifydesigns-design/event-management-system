@@ -1,5 +1,10 @@
 const API_BASE = 'http://localhost:5000/api';
 
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[char]);
+}
 function getToken() { return localStorage.getItem('token'); }
 function getUser() { const raw = localStorage.getItem('user'); return raw ? JSON.parse(raw) : null; }
 function apiHeaders() {
@@ -13,16 +18,18 @@ async function fetchJson(path, options = {}) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/organizer/login.html';
+    throw new Error('Your session has expired. Please sign in again.');
   }
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error('Request failed');
   return res.json();
 }
 
 function formatCurrency(value) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+  return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Number(value) || 0);
 }
 function formatDate(value) {
-  return new Date(value).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Date unavailable' : date.toLocaleDateString('en-KE', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 const organizerDashboard = {
@@ -33,8 +40,8 @@ const organizerDashboard = {
       return;
     }
 
-    document.getElementById('user-name').textContent = user.name;
-    document.getElementById('user-avatar').textContent = user.name.charAt(0).toUpperCase();
+    document.getElementById('user-name').textContent = user.name || 'Organizer';
+    document.getElementById('user-avatar').textContent = (user.name || 'O').charAt(0).toUpperCase();
 
     await this.loadStats();
     await this.loadEvents();
@@ -50,7 +57,8 @@ const organizerDashboard = {
   async loadStats() {
     try {
       const data = await fetchJson('/events');
-      const events = (data.events || []).filter(e => String(e.organizer) === String(getUser()._id) || getUser().role === 'admin');
+      const user = getUser();
+      const events = (data.events || []).filter(e => String(e.organizer) === String(user?._id) || user?.role === 'admin');
 
       const totalEvents = events.length;
       const upcomingEvents = events.filter(e => new Date(e.date) >= new Date().setHours(0,0,0,0)).length;
@@ -81,25 +89,29 @@ const organizerDashboard = {
     try {
       const data = await fetchJson('/events');
       const user = getUser();
-      const events = (data.events || []).filter(e => String(e.organizer) === String(user._id) || user.role === 'admin').slice(0, 10);
+      const events = (data.events || []).filter(e => String(e.organizer) === String(user?._id) || user?.role === 'admin').slice(0, 10);
       const container = document.getElementById('events-list');
       if (!container) return;
       if (events.length === 0) {
         container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📅</div><div class="empty-state-title">No events</div></div>';
         return;
       }
-      container.innerHTML = events.map((e) => `
-        <tr>
-          <td>${e.title}</td>
-          <td>${formatDate(e.date)}</td>
-          <td>${e.city}</td>
-          <td><span class="badge ${e.status === 'published' ? 'badge-success' : 'badge-secondary'}">${e.status}</span></td>
-          <td class="table-actions">
-            <a href="/organizer/sales-report.html?event=${e._id}" class="table-link">Sales Report</a>
-            <a href="/coordinator/scan.html?event=${e._id}" class="table-link">Scan</a>
-          </td>
-        </tr>
-      `).join('');
+      container.innerHTML = events.map((e) => {
+        const id = encodeURIComponent(String(e._id || ''));
+        const status = e.status === 'published' ? 'published' : 'draft';
+        return `
+          <tr>
+            <td>${escapeHTML(e.title)}</td>
+            <td>${escapeHTML(formatDate(e.date))}</td>
+            <td>${escapeHTML(e.city)}</td>
+            <td><span class="badge ${status === 'published' ? 'badge-success' : 'badge-secondary'}">${status}</span></td>
+            <td class="table-actions">
+              <a href="/organizer/sales-report.html?event=${id}" class="table-link">Sales Report</a>
+              <a href="/coordinator/scan.html?event=${id}" class="table-link">Scan</a>
+            </td>
+          </tr>
+        `;
+      }).join('');
     } catch (err) {
       console.error('Failed to load organizer events:', err);
     }
@@ -114,21 +126,21 @@ const organizerDashboard = {
       container.innerHTML = `
         <div class="stat-card mb-3">
           <div class="stat-content">
-            <div class="stat-value">${data.ticketsSold || 0}</div>
+            <div class="stat-value">${Number(data.ticketsSold) || 0}</div>
             <div class="stat-label">Tickets Sold</div>
           </div>
           <div class="stat-icon">🎫</div>
         </div>
         <div class="stat-card mb-3">
           <div class="stat-content">
-            <div class="stat-value">${data.ticketsScanned || 0}</div>
+            <div class="stat-value">${Number(data.ticketsScanned) || 0}</div>
             <div class="stat-label">Tickets Scanned</div>
           </div>
           <div class="stat-icon">✅</div>
         </div>
       `;
     } catch (err) {
-      console.error('Failed to load sales report:', err);
+      console.error('Failed to load organizer sales report:', err);
       const container = document.getElementById('sales-report-list');
       if (container) container.innerHTML = '<div class="alert alert-error">Unable to load sales report.</div>';
     }
