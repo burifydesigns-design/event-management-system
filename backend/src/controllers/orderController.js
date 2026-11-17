@@ -10,50 +10,37 @@ exports.createOrder = async (req, res, next) => {
       return res.status(400).json({ message: 'eventId, ticketTypeId and quantity (1–10) are required' });
     }
 
-    const { data: ticketType, error: ticketError } = await db().from('ticket_types')
-      .select('id,event_id,name,price,quantity_available,quantity_sold').eq('id', ticketTypeId).maybeSingle();
-    if (ticketError) throw ticketError;
-    if (!ticketType || ticketType.event_id !== eventId) return res.status(404).json({ message: 'Ticket type not found for this event' });
-    if (ticketType.quantity_available - ticketType.quantity_sold < qty) {
-      return res.status(409).json({ message: 'Not enough tickets are available' });
+    // A client-generated key is reused for retries of the same checkout attempt.
+    const suppliedKey = req.headers['idempotency-key'];
+    const idempotencyKey = String(suppliedKey || randomUUID()).trim();
+    if (idempotencyKey.length < 8 || idempotencyKey.length > 200) {
+      return res.status(400).json({ message: 'A valid Idempotency-Key header is required' });
     }
 
-    const { data: event, error: eventError } = await db().from('events')
-      .select('id,status,currency,registration_opens_at,registration_closes_at,deleted_at')
-      .eq('id', eventId).maybeSingle();
-    if (eventError) throw eventError;
-    if (!event || event.status !== 'published' || event.deleted_at) return res.status(404).json({ message: 'Event is not available for purchase' });
-    const now = Date.now();
-    if (event.registration_opens_at && now < Date.parse(event.registration_opens_at)) return res.status(409).json({ message: 'Registration has not opened' });
-    if (event.registration_closes_at && now > Date.parse(event.registration_closes_at)) return res.status(409).json({ message: 'Registration is closed' });
-
-    const idempotencyKey = String(req.headers['idempotency-key'] || randomUUID()).slice(0, 200);
-    const totalAmount = Number(ticketType.price) * qty;
-    const { data: order, error: orderError } = await db().from('orders').insert({
-      attendee_id: req.user.userId, event_id: eventId, total_amount: totalAmount,
-      currency: event.currency || 'KES', status: 'pending', idempotency_key: idempotencyKey,
-    }).select('*').single();
-    if (orderError) {
-      if (orderError.code === '23505') return res.status(409).json({ message: 'This checkout request has already been submitted' });
-      throw orderError;
-    }
-
-    const { error: itemError } = await db().from('order_items').insert({
-      order_id: order.id, ticket_type_id: ticketType.id, description: ticketType.name,
-      quantity: qty, unit_price: ticketType.price,
+    const { data, error } = await db().rpc('create_order_with_ticket_hold', {
+      p_attendee_id: req.user.userId,
+      p_event_id: eventId,
+      p_ticket_type_id: ticketTypeId,
+      p_quantity: qty,
+      p_idempotency_key: idempotencyKey,
+      p_payment_provider: process.env.PAYMENT_PROVIDER || 'unconfigured',
     });
-    if (itemError) throw itemError;
 
-    const { data: payment, error: paymentError } = await db().from('payments').insert({
-      order_id: order.id, provider: process.env.PAYMENT_PROVIDER || 'unconfigured',
-      amount: totalAmount, currency: event.currency || 'KES', status: 'pending',
-      idempotency_key: idempotencyKey,
-    }).select('id,order_id,provider,amount,currency,status,created_at').single();
-    if (paymentError) throw paymentError;
+    if (error) {
+      if (error.code === 'P0002') return res.status(404).json({ message: error.message });
+      if (error.code === 'P0001') return res.status(409).json({ message: error.message });
+      if (error.code === '22023') return res.status(400).json({ message: error.message });
+      throw error;
+    }
 
-    // No ticket is issued here. A verified provider webhook must transition the payment
-    // to succeeded and issue tickets atomically before a ticket becomes usable.
-    res.status(202).json({ order, payment, message: 'Order created and awaiting verified payment. No ticket has been issued yet.' });
+    const status = data && data.replayed ? 200 : 202;
+    return res.status(status).json({
+      order: data.order,
+      payment: data.payment,
+      replayed: Boolean(data.replayed),
+      holdExpiresAt: data.order && data.order.hold_expires_at,
+      message: 'Ticket inventory is held for 10 minutes while payment is pending. No ticket is issued until payment is verified.',
+    });
   } catch (err) {
     next(err);
   }

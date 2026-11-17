@@ -5,8 +5,11 @@ const eventShape = (event) => event ? { ...event, date: event.event_date, time: 
 exports.listEvents = async (req,res,next) => {
  try {
   const {search,category,city,date,price,page=1,limit=12}=req.query;
-  let q=db().from('events').select('*, organizer:profiles!events_organizer_id_fkey(id,name,email)',{count:'exact'}).eq('status','published').is('deleted_at',null);
-  if(search)q=q.or('title.ilike.%'+search+'%,description.ilike.%'+search+'%,city.ilike.%'+search+'%');
+  let q=db().from('events').select('*, organizer:profiles!events_organizer_id_fkey(id,name)',{count:'exact'}).eq('status','published').is('deleted_at',null);
+  if(search){
+   const term=String(search).slice(0,100).replace(/[,%()]/g,' ').trim();
+   if(term)q=q.or('title.ilike.%'+term+'%,description.ilike.%'+term+'%,city.ilike.%'+term+'%');
+  }
   if(category)q=q.eq('category',category);
   if(city)q=q.ilike('city','%'+city+'%');
   if(date==='upcoming')q=q.gte('event_date',new Date().toISOString());
@@ -16,13 +19,16 @@ exports.listEvents = async (req,res,next) => {
   const p=Math.max(1,Number(page)),l=Math.min(100,Math.max(1,Number(limit)));
   const {data,error,count}=await q.order('event_date').range((p-1)*l,p*l-1);
   if(error)throw error;
+  res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
   res.json({events:(data||[]).map(eventShape),page:p,limit:l,totalEvents:count||0,totalPages:Math.ceil((count||0)/l)});
  }catch(err){next(err);}
 };
 exports.getEvent=async(req,res,next)=>{
  try{
-  const {data,error}=await db().from('events').select('*, organizer:profiles!events_organizer_id_fkey(id,name,email)').eq('id',req.params.id).eq('status','published').is('deleted_at',null).maybeSingle();
-  if(error)throw error;if(!data)return res.status(404).json({message:'Event not found'});res.json(eventShape(data));
+  const {data,error}=await db().from('events').select('*, organizer:profiles!events_organizer_id_fkey(id,name)').eq('id',req.params.id).eq('status','published').is('deleted_at',null).maybeSingle();
+  if(error)throw error;if(!data)return res.status(404).json({message:'Event not found'});
+  res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+  res.json(eventShape(data));
  }catch(err){next(err);}
 };
 exports.createEvent=async(req,res,next)=>{
