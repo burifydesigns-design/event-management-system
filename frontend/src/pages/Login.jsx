@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import Loading from '../components/Loading'
 import ErrorMessage from '../components/ErrorMessage'
 
 export default function Login() {
@@ -35,13 +34,16 @@ export default function Login() {
         {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
         <form onSubmit={handleSubmit} className="form">
           <div className="field">
-            <label>Email</label>
-            <input id="email" className="input" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="you@example.com" required />
+            <label htmlFor="email">Email</label>
+            <input id="email" className="input" type="email" autoComplete="username" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="you@example.com" required />
           </div>
           <div className="field">
-            <label>Password</label>
-            <input id="password" className="input" type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="••••••••" required />
+            <label htmlFor="password">Password</label>
+            <input id="password" className="input" type="password" autoComplete="current-password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="••••••••" required />
           </div>
+          <p style={{ marginTop: -8, textAlign: 'right', fontSize: 14 }}>
+            <Link to="/forgot-password" style={{ color: 'var(--ac)', fontWeight: 600 }}>Forgot password?</Link>
+          </p>
           <div className="form-actions">
             <button type="submit" className="btn btn--primary" disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button>
           </div>
