@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { createOrder } from '../services/orderService'
+import { createOrder, initiateMpesaPayment } from '../services/orderService'
 import { getTicketTypesForEvent } from '../services/ticketService'
 
 function fmtDate(iso) {
@@ -16,6 +16,10 @@ export default function TicketSheet({ event, onClose }) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [order, setOrder] = useState(null)
+  const [phone, setPhone] = useState('')
+  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [paymentMessage, setPaymentMessage] = useState('')
+  const [checkoutKey, setCheckoutKey] = useState('')
 
   useEffect(() => {
     let active = true
@@ -33,7 +37,7 @@ export default function TicketSheet({ event, onClose }) {
   }, [eventId])
 
   const selectedType = ticketTypes.find((item) => item.id === selectedTypeId)
-  const available = selectedType ? Math.max(0, selectedType.quantity_available - selectedType.quantity_sold) : 0
+  const available = selectedType ? Math.max(0, selectedType.quantity_available - selectedType.quantity_sold - (selectedType.quantity_reserved || 0)) : 0
   const total = useMemo(() => Number(selectedType?.price || 0) * quantity, [selectedType, quantity])
 
   const submitOrder = async () => {
@@ -41,12 +45,28 @@ export default function TicketSheet({ event, onClose }) {
     setSubmitting(true)
     setError('')
     try {
-      const result = await createOrder({ eventId, ticketTypeId: selectedType.id, quantity })
+      const key = checkoutKey || globalThis.crypto?.randomUUID?.() || `checkout-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      if (!checkoutKey) setCheckoutKey(key)
+      const result = await createOrder({ eventId, ticketTypeId: selectedType.id, quantity, idempotencyKey: key })
       setOrder(result)
     } catch (err) {
       setError(err.response?.data?.message || 'Could not create the order.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const startMpesaPayment = async () => {
+    if (!order?.order?.id || !phone.trim()) return
+    setPaymentLoading(true)
+    setPaymentMessage('')
+    try {
+      const result = await initiateMpesaPayment({ orderId: order.order.id, phone })
+      setPaymentMessage(result.customerMessage || result.message || 'Payment prompt sent. Complete the request on your phone.')
+    } catch (err) {
+      setPaymentMessage(err.response?.data?.message || 'Could not start M-Pesa payment.')
+    } finally {
+      setPaymentLoading(false)
     }
   }
 
@@ -65,11 +85,19 @@ export default function TicketSheet({ event, onClose }) {
             <>
               <h3>Order created — payment pending</h3>
               <p style={{ color: 'var(--mu)', lineHeight: 1.6 }}>
-                Your order has been recorded, but payment has not been connected or verified. No ticket has been issued and you are not yet registered as paid.
+                Your order has been recorded. Payment is still pending; no ticket has been issued until M-Pesa confirms the transaction.
               </p>
               <p><strong>Order:</strong> {order.order?.id || 'Created'}</p>
               <p><strong>Amount:</strong> {order.payment?.currency || 'KES'} {Number(order.payment?.amount || total).toLocaleString()}</p>
               <p><strong>Status:</strong> {order.payment?.status || 'pending'}</p>
+              <div className="field" style={{ marginTop: 14 }}>
+                <label htmlFor="mpesa-phone">M-Pesa phone number</label>
+                <input id="mpesa-phone" className="input" type="tel" inputMode="tel" autoComplete="tel" placeholder="07XXXXXXXX" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              </div>
+              <button type="button" className="btn btn--primary" onClick={startMpesaPayment} disabled={paymentLoading || !phone.trim()} style={{ marginTop: 12 }}>
+                {paymentLoading ? 'Sending prompt…' : 'Pay with M-Pesa'}
+              </button>
+              {paymentMessage && <div className="alert" role="status" style={{ marginTop: 10 }}>{paymentMessage}</div>}
               <button type="button" className="btn btn--primary" onClick={close} style={{ marginTop: 16 }}>Close</button>
             </>
           ) : loadingTypes ? (
@@ -83,7 +111,7 @@ export default function TicketSheet({ event, onClose }) {
                 <select id="ticket-type" className="input" value={selectedTypeId} onChange={(e) => setSelectedTypeId(e.target.value)}>
                   {ticketTypes.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.name} — KES {Number(item.price).toLocaleString()} ({Math.max(0, item.quantity_available - item.quantity_sold)} available)
+                      {item.name} — KES {Number(item.price).toLocaleString()} ({Math.max(0, item.quantity_available - item.quantity_sold - (item.quantity_reserved || 0))} available)
                     </option>
                   ))}
                 </select>
@@ -100,7 +128,7 @@ export default function TicketSheet({ event, onClose }) {
                 {submitting ? 'Creating order…' : 'Create order'}
               </button>
               <p style={{ color: 'var(--mu)', fontSize: 12, marginTop: 12 }}>
-                Payment is not enabled in this build. Creating an order does not charge you or issue a ticket.
+                Your ticket is held for 10 minutes. Complete payment before the hold expires; tickets are issued only after the provider confirms payment.
               </p>
             </>
           )}
