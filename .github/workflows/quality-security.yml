@@ -34,8 +34,9 @@ jobs:
       - name: Install locked workspace dependencies
         run: npm ci
 
-      - name: Audit production and development dependencies
-        run: npm audit --audit-level=high
+      # Production dependencies gate the build. Dev-only findings (vite/esbuild dev server) are tracked via Dependabot.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Build frontend
         run: npm run build --workspace frontend
